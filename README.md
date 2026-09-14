@@ -110,7 +110,7 @@ From another Gradle project:
 ```kotlin
 repositories {
     maven {
-        url = uri("https://maven.pkg.github.com/amine2233/StateMachineKt")
+        url = uri("https://maven.pkg.github.com/amine2233/statemachine-kt")
         credentials {
             username = providers.gradleProperty("gpr.user").getOrElse(System.getenv("GITHUB_ACTOR"))
             password = providers.gradleProperty("gpr.key").getOrElse(System.getenv("GITHUB_TOKEN"))

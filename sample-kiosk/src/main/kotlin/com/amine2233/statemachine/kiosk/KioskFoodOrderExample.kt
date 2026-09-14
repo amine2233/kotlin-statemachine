@@ -78,7 +78,7 @@ object KioskOrderWorkflow {
  * plain here so the example runs with no Android dependency.
  */
 class KioskOrderSession(
-    orderId: String,
+    val orderId: String,
     restoredStateName: String? = null,
 ) {
     // "Restoring a machine" (see the Swift README): the graph never changes,

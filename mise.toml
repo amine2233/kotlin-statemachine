@@ -1,2 +1,5 @@
 [tools]
 java = "temurin-17"
+
+[env]
+_.file = { path = ".env.local", redact = true }
