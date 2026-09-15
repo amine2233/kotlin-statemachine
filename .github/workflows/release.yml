@@ -1,48 +1,23 @@
+# Copy into the consumer repo at: .github/workflows/release.yml
+# Requires a mise.toml with `release` and `publish` tasks (see templates/mise.toml)
+# and a .releaserc.json (see templates/.releaserc.json).
 name: Release
 
-# Every push to main runs semantic-release: conventional commits decide the
-# next version (feat -> minor, fix -> patch, BREAKING CHANGE -> major).
-# When a release is due it updates CHANGELOG.md, tags, publishes the
-# `statemachine` library to GitHub Packages and creates the GitHub Release
-# with the jars attached. No commits worth releasing -> no-op.
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
-permissions:
-  contents: write
-  packages: write
-  issues: write
-  pull-requests: write
-
 jobs:
-  test:
-    uses: ./.github/workflows/ci.yml
+  ci:
+    uses: amine2233/kotlin-ci-shared/.github/workflows/ci.yml@1.0.0
 
   release:
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Set up JDK from mise.toml
-        uses: jdx/mise-action@v2
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Semantic Release
-        uses: cycjimmy/semantic-release-action@v4
-        with:
-          extra_plugins: |
-            @semantic-release/changelog
-            @semantic-release/exec
-            @semantic-release/git
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_ACTOR: ${{ github.actor }}
+    needs: ci
+    permissions:
+      contents: write
+      packages: write
+      issues: write
+      pull-requests: write
+    uses: amine2233/kotlin-ci-shared/.github/workflows/semantic-release.yml@1.0.0
+    secrets: inherit

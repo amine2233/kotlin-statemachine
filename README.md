@@ -82,26 +82,21 @@ full ordering flow (`idle -> browsingMenu -> ... -> orderConfirmed`), wired to
 ## Development
 
 ```
-gradle test    # run the library's unit tests
-gradle build   # compile everything
+mise run test   # run the library's unit tests
+mise run lint   # ktlint
+mise run build  # compile everything
 ```
-
-> This repo doesn't check in a Gradle wrapper. If you'd like one locally, run
-> `gradle wrapper --gradle-version 8.9` once and commit the generated
-> `gradlew`, `gradlew.bat`, and `gradle/wrapper/` files. CI doesn't need it —
-> the workflows install Gradle 8.9 directly via `gradle/actions/setup-gradle`.
 
 ## CI/CD
 
-- **`.github/workflows/ci.yml`** — runs `gradle test` on every push and pull
-  request to `main`, and uploads the test report as a build artifact.
-- **`.github/workflows/publish.yml`** — publishes the `statemachine` module to
-  GitHub Packages whenever a GitHub Release is published (the release's tag,
-  e.g. `v1.2.0`, becomes the artifact version), or on demand via
-  "Run workflow" with a version input.
+CI and releases come from [kotlin-ci-shared](https://github.com/amine2233/kotlin-ci-shared).
+All logic lives in `mise.toml`:
 
-No extra secrets to configure — both workflows use the automatically
-provisioned `GITHUB_TOKEN`, which has `packages: write` for this repo.
+- `mise run test` / `mise run lint` — what the `CI` workflow runs on pull requests.
+- Merging a `feat:` / `fix:` commit into `main` runs semantic-release: it tags
+  `vX.Y.Z`, updates `CHANGELOG.md`, publishes `com.amine2233.statemachine:statemachine`
+  to GitHub Packages and creates the GitHub release with the jars attached.
+- `mise run release --dry-run` previews the next version locally.
 
 ### Consuming the published package
 
