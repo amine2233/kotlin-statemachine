@@ -37,7 +37,7 @@ publishing {
                 name.set("StateMachine")
                 description.set(
                     "A small finite state machine for Kotlin/coroutines, " +
-                        "ported from amine2233/StateMachine (Swift)."
+                        "ported from amine2233/StateMachine (Swift).",
                 )
                 url.set("https://github.com/amine2233/kotlin-statemachine")
                 licenses {
