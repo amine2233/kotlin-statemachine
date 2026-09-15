@@ -3,7 +3,7 @@ package com.amine2233.statemachine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-/**
+/*
  * Kotlin port of amine2233/StateMachine (https://github.com/amine2233/StateMachine).
  *
  * A small finite state machine. You describe the graph once with [State] and
@@ -17,27 +17,37 @@ import kotlinx.coroutines.sync.withLock
  */
 
 /** A named node in the graph. Two states are equal when their names match. */
-data class State(val name: String) {
+data class State(
+    val name: String,
+) {
     override fun toString(): String = name
 }
 
 /** A named edge: firing it moves the machine from [from] to [to]. */
-data class Transition(val name: String, val from: State, val to: State) {
+data class Transition(
+    val name: String,
+    val from: State,
+    val to: State,
+) {
     override fun toString(): String = "$name (${from.name} -> ${to.name})"
 }
 
 /** Mirrors Swift's `TransitionError`. */
-sealed class TransitionError(message: String) : Exception(message) {
-
+sealed class TransitionError(
+    message: String,
+) : Exception(message) {
     /** [transition] is not part of this machine's graph at all. */
-    class Unknown(val transition: Transition) :
-        TransitionError("Transition '${transition.name}' is unknown to this machine.")
+    class Unknown(
+        val transition: Transition,
+    ) : TransitionError("Transition '${transition.name}' is unknown to this machine.")
 
     /** [transition] exists in the graph but doesn't start from [currentState]. */
-    class NotAllowed(val transition: Transition, val currentState: State) :
-        TransitionError(
+    class NotAllowed(
+        val transition: Transition,
+        val currentState: State,
+    ) : TransitionError(
             "Transition '${transition.name}' requires state '${transition.from.name}' " +
-                "but the machine is currently in '${currentState.name}'."
+                "but the machine is currently in '${currentState.name}'.",
         )
 }
 
@@ -51,11 +61,25 @@ sealed class TransitionError(message: String) : Exception(message) {
  * replaces the first.
  */
 sealed class LifecycleEvent {
-    data class BeforeTransition(val transition: Transition) : LifecycleEvent()
-    data class LeaveState(val state: State) : LifecycleEvent()
-    data class OnState(val state: State) : LifecycleEvent()
-    data class OnTransition(val transition: Transition) : LifecycleEvent()
-    data class AfterTransition(val transition: Transition) : LifecycleEvent()
+    data class BeforeTransition(
+        val transition: Transition,
+    ) : LifecycleEvent()
+
+    data class LeaveState(
+        val state: State,
+    ) : LifecycleEvent()
+
+    data class OnState(
+        val state: State,
+    ) : LifecycleEvent()
+
+    data class OnTransition(
+        val transition: Transition,
+    ) : LifecycleEvent()
+
+    data class AfterTransition(
+        val transition: Transition,
+    ) : LifecycleEvent()
 }
 
 /** Free-form payload passed through `fire` to observers, like Swift's `userInfo`. */
@@ -102,24 +126,29 @@ class StateMachine(
     fun isCurrent(state: State): Boolean = current == state
 
     /** Whether [transition] both exists and starts from [currentState]. */
-    suspend fun canFire(transition: Transition): Boolean = mutex.withLock {
-        transitions.contains(transition) && transition.from == current
-    }
+    suspend fun canFire(transition: Transition): Boolean =
+        mutex.withLock {
+            transitions.contains(transition) && transition.from == current
+        }
 
     /**
      * Transitions that could fire right now. This is what UI usually binds
      * to — buttons enable themselves from the graph.
      */
-    suspend fun allowedTransitions(): List<Transition> = mutex.withLock {
-        transitions.filter { it.from == current }
-    }
+    suspend fun allowedTransitions(): List<Transition> =
+        mutex.withLock {
+            transitions.filter { it.from == current }
+        }
 
     /**
      * Registers [handler] for [event]. Only one handler per [LifecycleEvent]
      * is kept — calling this again with an event equal to one already
      * registered replaces the previous handler.
      */
-    suspend fun on(event: LifecycleEvent, handler: LifecycleHandler) {
+    suspend fun on(
+        event: LifecycleEvent,
+        handler: LifecycleHandler,
+    ) {
         mutex.withLock { observers[event] = handler }
     }
 
@@ -138,7 +167,10 @@ class StateMachine(
      * finished, so the machine's state is settled by the time the caller
      * continues.
      */
-    suspend fun fire(transition: Transition, userInfo: UserInfo? = null) {
+    suspend fun fire(
+        transition: Transition,
+        userInfo: UserInfo? = null,
+    ) {
         mutex.withLock {
             if (!transitions.contains(transition)) {
                 throw TransitionError.Unknown(transition)

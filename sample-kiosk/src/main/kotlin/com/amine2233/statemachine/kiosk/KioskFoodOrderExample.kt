@@ -29,7 +29,6 @@ import kotlinx.coroutines.runBlocking
  * ```
  */
 object KioskOrderWorkflow {
-
     // States — the graph is static data, exactly like Swift's `OrderWorkflow.transitions`.
     val idle = State("idle")
     val browsingMenu = State("browsingMenu")
@@ -61,12 +60,25 @@ object KioskOrderWorkflow {
     val cancelFromCheckout = Transition("cancel", from = checkout, to = cancelled)
     val restart = Transition("restart", from = cancelled, to = idle)
 
-    val transitions: List<Transition> = listOf(
-        startOrder, selectItem, customize, addToCartDirect, addToCartCustomized,
-        continueShopping, goToCheckout, pay, confirmPayment, newOrder,
-        cancelFromBrowsing, cancelFromItemSelected, cancelFromCustomizing,
-        cancelFromCart, cancelFromCheckout, restart,
-    )
+    val transitions: List<Transition> =
+        listOf(
+            startOrder,
+            selectItem,
+            customize,
+            addToCartDirect,
+            addToCartCustomized,
+            continueShopping,
+            goToCheckout,
+            pay,
+            confirmPayment,
+            newOrder,
+            cancelFromBrowsing,
+            cancelFromItemSelected,
+            cancelFromCustomizing,
+            cancelFromCart,
+            cancelFromCheckout,
+            restart,
+        )
 }
 
 /**
@@ -84,10 +96,11 @@ class KioskOrderSession(
     // "Restoring a machine" (see the Swift README): the graph never changes,
     // only the cursor does — so resuming an order is just handing back its
     // last known state name.
-    private val machine = StateMachine(
-        initialState = restoredStateName?.let { State(it) } ?: KioskOrderWorkflow.idle,
-        transitions = KioskOrderWorkflow.transitions,
-    )
+    private val machine =
+        StateMachine(
+            initialState = restoredStateName?.let { State(it) } ?: KioskOrderWorkflow.idle,
+            transitions = KioskOrderWorkflow.transitions,
+        )
 
     private val _screen = MutableStateFlow(machine.currentState)
     val screen: StateFlow<State> = _screen.asStateFlow()
@@ -124,8 +137,11 @@ class KioskOrderSession(
      * tappable in the first place — useful for a UI layer that just wants a
      * boolean rather than a caught exception.
      */
-    suspend fun perform(transition: Transition, userInfo: Map<String, Any?>? = null): Boolean {
-        return try {
+    suspend fun perform(
+        transition: Transition,
+        userInfo: Map<String, Any?>? = null,
+    ): Boolean =
+        try {
             machine.fire(transition, userInfo)
             _screen.value = machine.currentState
             refreshAvailableActions()
@@ -135,54 +151,54 @@ class KioskOrderSession(
         } catch (e: TransitionError.Unknown) {
             false
         }
-    }
 }
 
 /**
  * Simulates one customer session end-to-end, plus a couple of edge cases:
  * an invalid transition, and resuming an order from persisted state.
  */
-fun main() = runBlocking {
-    val session = KioskOrderSession(orderId = "K-1024")
-    session.observeLifecycle { message -> println("[log] $message") }
+fun main() =
+    runBlocking {
+        val session = KioskOrderSession(orderId = "K-1024")
+        session.observeLifecycle { message -> println("[log] $message") }
 
-    suspend fun show(label: String) {
-        println("$label -> screen=${session.screen.value}, actions=${session.availableActions.value.map { it.name }}")
+        suspend fun show(label: String) {
+            println("$label -> screen=${session.screen.value}, actions=${session.availableActions.value.map { it.name }}")
+        }
+
+        show("start")
+
+        session.perform(KioskOrderWorkflow.startOrder)
+        show("after startOrder")
+
+        session.perform(KioskOrderWorkflow.selectItem)
+        show("after selectItem")
+
+        session.perform(KioskOrderWorkflow.customize)
+        show("after customize (e.g. 'no onions')")
+
+        session.perform(KioskOrderWorkflow.addToCartCustomized)
+        show("after addToCart")
+
+        // Trying to pay before checking out: the transition exists in the graph
+        // but doesn't start from the current state, so it's rejected — this is
+        // exactly what a "Pay" button's enabled state should be driven by.
+        val rejected = session.perform(KioskOrderWorkflow.pay)
+        println("pay before checkout accepted? $rejected")
+
+        session.perform(KioskOrderWorkflow.goToCheckout)
+        session.perform(KioskOrderWorkflow.pay)
+        session.perform(KioskOrderWorkflow.confirmPayment, userInfo = mapOf("ticketNumber" to 42))
+        show("after confirmPayment")
+
+        session.perform(KioskOrderWorkflow.newOrder)
+        show("after newOrder (back to idle)")
+
+        // Resuming a different order that was persisted mid-checkout —
+        // only the state name needs to have been saved.
+        val resumed = KioskOrderSession(orderId = "K-1025", restoredStateName = "checkout")
+        println(
+            "resumed order -> screen=${resumed.screen.value}, " +
+                "actions=${resumed.availableActions.value.map { it.name }}",
+        )
     }
-
-    show("start")
-
-    session.perform(KioskOrderWorkflow.startOrder)
-    show("after startOrder")
-
-    session.perform(KioskOrderWorkflow.selectItem)
-    show("after selectItem")
-
-    session.perform(KioskOrderWorkflow.customize)
-    show("after customize (e.g. 'no onions')")
-
-    session.perform(KioskOrderWorkflow.addToCartCustomized)
-    show("after addToCart")
-
-    // Trying to pay before checking out: the transition exists in the graph
-    // but doesn't start from the current state, so it's rejected — this is
-    // exactly what a "Pay" button's enabled state should be driven by.
-    val rejected = session.perform(KioskOrderWorkflow.pay)
-    println("pay before checkout accepted? $rejected")
-
-    session.perform(KioskOrderWorkflow.goToCheckout)
-    session.perform(KioskOrderWorkflow.pay)
-    session.perform(KioskOrderWorkflow.confirmPayment, userInfo = mapOf("ticketNumber" to 42))
-    show("after confirmPayment")
-
-    session.perform(KioskOrderWorkflow.newOrder)
-    show("after newOrder (back to idle)")
-
-    // Resuming a different order that was persisted mid-checkout —
-    // only the state name needs to have been saved.
-    val resumed = KioskOrderSession(orderId = "K-1025", restoredStateName = "checkout")
-    println(
-        "resumed order -> screen=${resumed.screen.value}, " +
-            "actions=${resumed.availableActions.value.map { it.name }}"
-    )
-}
