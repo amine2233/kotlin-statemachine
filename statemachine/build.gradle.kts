@@ -39,7 +39,7 @@ publishing {
                     "A small finite state machine for Kotlin/coroutines, " +
                         "ported from amine2233/StateMachine (Swift)."
                 )
-                url.set("https://github.com/amine2233/statemachine-kt")
+                url.set("https://github.com/amine2233/kotlin-statemachine")
                 licenses {
                     license {
                         name.set("MIT License")
@@ -53,7 +53,7 @@ publishing {
                     }
                 }
                 scm {
-                    url.set("https://github.com/amine2233/statemachine-kt")
+                    url.set("https://github.com/amine2233/kotlin-statemachine")
                 }
             }
         }
@@ -62,7 +62,7 @@ publishing {
     repositories {
         maven {
             name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/amine2233/statemachine-kt")
+            url = uri("https://maven.pkg.github.com/amine2233/kotlin-statemachine")
             credentials {
                 username = System.getenv("GITHUB_ACTOR")
                 password = System.getenv("GITHUB_TOKEN")
