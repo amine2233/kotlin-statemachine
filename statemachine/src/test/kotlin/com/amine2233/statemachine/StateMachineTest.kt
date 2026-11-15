@@ -6,10 +6,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
+import kotlin.coroutines.Continuation
+import kotlin.coroutines.intrinsics.suspendCoroutineUninterceptedOrReturn
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
@@ -472,5 +475,409 @@ class StateMachineTest {
             testScheduler.advanceUntilIdle()
 
             assertEquals(archived, machine.currentState)
+        }
+
+    private fun guardedMachine(guard: suspend (UserInfo?) -> Boolean) =
+        StateMachine(
+            initialState = draft,
+            transitions = listOf(Transition("publish", from = draft, to = published, guard = guard), archive),
+        )
+
+    @Test
+    fun `a passing guard lets the transition fire and run every handler`() =
+        runTest {
+            val machine = guardedMachine { true }
+            val order = mutableListOf<String>()
+            machine.recordLifecycle(order)
+
+            machine.fire(publish)
+
+            assertEquals(published, machine.currentState)
+            assertEquals(listOf("before", "leave", "onState", "onTransition", "after"), order)
+        }
+
+    @Test
+    fun `a rejecting guard throws GuardRejected without moving or running handlers`() =
+        runTest {
+            val machine = guardedMachine { false }
+            val order = mutableListOf<String>()
+            machine.recordLifecycle(order)
+
+            val thrown = assertFailsWith<TransitionError.GuardRejected> { machine.fire(publish) }
+
+            assertEquals(publish, thrown.transition)
+            assertEquals(draft, machine.currentState)
+            assertEquals(emptyList(), order)
+        }
+
+    @Test
+    fun `canFire evaluates the guard`() =
+        runTest {
+            assertTrue(guardedMachine { true }.canFire(publish))
+            assertFalse(guardedMachine { false }.canFire(publish))
+        }
+
+    @Test
+    fun `a guard can decide from userInfo`() =
+        runTest {
+            val machine = guardedMachine { userInfo -> (userInfo?.get("cart") as? List<*>).orEmpty().isNotEmpty() }
+            val emptyCart = mapOf("cart" to emptyList<String>())
+            val fullCart = mapOf("cart" to listOf("burger"))
+
+            assertFalse(machine.canFire(publish, emptyCart))
+            assertTrue(machine.canFire(publish, fullCart))
+
+            assertFailsWith<TransitionError.GuardRejected> { machine.fire(publish, emptyCart) }
+            assertEquals(draft, machine.currentState)
+
+            machine.fire(publish, fullCart)
+            assertEquals(published, machine.currentState)
+        }
+
+    @Test
+    fun `the guard receives the exact userInfo passed to fire`() =
+        runTest {
+            val received = mutableListOf<UserInfo?>()
+            val machine =
+                guardedMachine { userInfo ->
+                    received += userInfo
+                    true
+                }
+            val userInfo = mapOf("actor" to "editor")
+
+            machine.fire(publish, userInfo)
+
+            assertEquals(1, received.size)
+            assertSame(userInfo, received.single())
+        }
+
+    @Test
+    fun `transitions differing only in their guard are equal`() {
+        val guarded = Transition("publish", from = draft, to = published, guard = { false })
+
+        assertEquals(publish, guarded)
+        assertEquals(publish.hashCode(), guarded.hashCode())
+        assertEquals(publish.toString(), guarded.toString())
+    }
+
+    @Test
+    fun `an equal transition without a guard cannot bypass the registered guard`() =
+        runTest {
+            val machine = guardedMachine { false }
+            val unguarded = Transition("publish", from = draft, to = published)
+
+            assertFailsWith<TransitionError.GuardRejected> { machine.fire(unguarded) }
+            assertFalse(machine.canFire(unguarded))
+            assertEquals(draft, machine.currentState)
+        }
+
+    @Test
+    fun `only the registered guard runs, never the caller's copy`() =
+        runTest {
+            var callerGuardCalls = 0
+            val machine = guardedMachine { true }
+            val callersCopy =
+                Transition("publish", from = draft, to = published, guard = {
+                    callerGuardCalls++
+                    false
+                })
+
+            assertTrue(machine.canFire(callersCopy))
+            machine.fire(callersCopy)
+
+            assertEquals(published, machine.currentState)
+            assertEquals(0, callerGuardCalls)
+        }
+
+    @Test
+    fun `a throwing guard propagates unchanged and leaves the machine usable`() =
+        runTest {
+            val failure = HandlerFailure()
+            var shouldThrow = true
+            val machine =
+                guardedMachine {
+                    if (shouldThrow) throw failure
+                    true
+                }
+            val order = mutableListOf<String>()
+            machine.recordLifecycle(order)
+
+            assertSame(failure, assertFailsWith<HandlerFailure> { machine.fire(publish) })
+            assertSame(failure, assertFailsWith<HandlerFailure> { machine.canFire(publish) })
+            assertEquals(draft, machine.currentState)
+            assertEquals(emptyList(), order)
+
+            shouldThrow = false
+            machine.fire(publish)
+
+            assertEquals(published, machine.currentState)
+        }
+
+    @Test
+    fun `NotAllowed is thrown before the guard is evaluated`() =
+        runTest {
+            var guardCalls = 0
+            val guardedArchive =
+                Transition("archive", from = published, to = archived, guard = {
+                    guardCalls++
+                    true
+                })
+            val machine = StateMachine(initialState = draft, transitions = listOf(publish, guardedArchive))
+
+            assertFailsWith<TransitionError.NotAllowed> { machine.fire(guardedArchive) }
+            assertFalse(machine.canFire(guardedArchive))
+            assertEquals(0, guardCalls)
+        }
+
+    @Test
+    fun `a guard evaluated by fire can read the machine without deadlocking`() =
+        runTest(timeout = 5.seconds) {
+            lateinit var machine: StateMachine
+            var seenState: State? = null
+            var seenAllowed: List<Transition>? = null
+            var seenCanFireArchive: Boolean? = null
+            machine =
+                guardedMachine {
+                    seenState = machine.currentState
+                    seenAllowed = machine.allowedTransitions()
+                    seenCanFireArchive = machine.canFire(archive)
+                    true
+                }
+
+            machine.fire(publish)
+
+            assertEquals(published, machine.currentState)
+            assertEquals(draft, seenState)
+            assertEquals(listOf(publish), seenAllowed)
+            assertEquals(false, seenCanFireArchive)
+        }
+
+    @Test
+    fun `a guard evaluated by canFire can read the machine without deadlocking`() =
+        runTest(timeout = 5.seconds) {
+            lateinit var machine: StateMachine
+            var seenAllowed: List<Transition>? = null
+            machine =
+                guardedMachine {
+                    seenAllowed = machine.allowedTransitions()
+                    !machine.canFire(archive)
+                }
+
+            assertTrue(machine.canFire(publish))
+            assertEquals(listOf(publish), seenAllowed)
+        }
+
+    @Test
+    fun `a guard that fires the same machine throws ReentrantFire`() =
+        runTest(timeout = 5.seconds) {
+            lateinit var machine: StateMachine
+            machine =
+                guardedMachine {
+                    machine.fire(publish)
+                    true
+                }
+
+            assertFailsWith<TransitionError.ReentrantFire> { machine.fire(publish) }
+            assertEquals(draft, machine.currentState)
+        }
+
+    @Test
+    fun `the 1_0_0 three-argument Transition constructor still exists on the JVM`() {
+        val constructor =
+            Transition::class.java.getConstructor(String::class.java, State::class.java, State::class.java)
+
+        val transition = constructor.newInstance("publish", draft, published)
+
+        assertEquals(publish, transition)
+        assertEquals(null, transition.guard)
+    }
+
+    @Test
+    fun `the 1_0_0 one-argument canFire still exists on the JVM`() =
+        runTest {
+            val canFire =
+                StateMachine::class.java.getMethod("canFire", Transition::class.java, Continuation::class.java)
+            val machine = guardedMachine { userInfo -> userInfo != null }
+
+            val result =
+                suspendCoroutineUninterceptedOrReturn<Any?> { continuation ->
+                    canFire.invoke(machine, publish, continuation)
+                }
+
+            assertEquals(false, result)
+        }
+
+    @Test
+    fun `a duplicate name from the same state throws IllegalArgumentException`() {
+        val a = State("a")
+        val b = State("b")
+        val c = State("c")
+
+        val error =
+            assertFailsWith<IllegalArgumentException> {
+                StateMachine(
+                    initialState = a,
+                    transitions = listOf(Transition("go", from = a, to = b), Transition("go", from = a, to = c)),
+                )
+            }
+
+        assertEquals("Duplicate transition 'go' from state 'a'.", error.message)
+    }
+
+    @Test
+    fun `an exact duplicate transition throws IllegalArgumentException`() {
+        assertFailsWith<IllegalArgumentException> {
+            StateMachine(initialState = draft, transitions = listOf(publish, archive, publish))
+        }
+    }
+
+    @Test
+    fun `an initial state outside the graph throws IllegalArgumentException`() {
+        val error =
+            assertFailsWith<IllegalArgumentException> {
+                StateMachine(initialState = State("nowhere"), transitions = listOf(publish, archive))
+            }
+
+        assertEquals("Initial state 'nowhere' is not part of any transition.", error.message)
+    }
+
+    @Test
+    fun `an empty transition list throws IllegalArgumentException`() {
+        assertFailsWith<IllegalArgumentException> {
+            StateMachine(initialState = draft, transitions = emptyList())
+        }
+    }
+
+    @Test
+    fun `the same name from different states is accepted`() =
+        runTest {
+            val a = State("a")
+            val b = State("b")
+            val x = State("x")
+            val cancelFromA = Transition("cancel", from = a, to = x)
+            val cancelFromB = Transition("cancel", from = b, to = x)
+
+            val machine = StateMachine(initialState = a, transitions = listOf(cancelFromA, cancelFromB))
+
+            assertEquals(listOf(cancelFromA), machine.allowedTransitions())
+        }
+
+    @Test
+    fun `fire by name moves the state and runs the observers in lifecycle order with the userInfo`() =
+        runTest {
+            val machine = machine()
+            val order = mutableListOf<String>()
+
+            machine.on(LifecycleEvent.BeforeTransition(publish)) { order += "before" }
+            machine.on(LifecycleEvent.LeaveState(draft)) { order += "leave" }
+            machine.on(LifecycleEvent.OnState(published)) { userInfo ->
+                order += "onState:${userInfo?.get("actor")}"
+            }
+            machine.on(LifecycleEvent.OnTransition(publish)) { order += "onTransition" }
+            machine.on(LifecycleEvent.AfterTransition(publish)) { order += "after" }
+
+            machine.fire("publish", mapOf("actor" to "editor"))
+
+            assertEquals(published, machine.currentState)
+            assertEquals(
+                listOf("before", "leave", "onState:editor", "onTransition", "after"),
+                order,
+            )
+        }
+
+    @Test
+    fun `a name used on several states resolves to the transition leaving the current state`() =
+        runTest {
+            val a = State("a")
+            val b = State("b")
+            val x = State("x")
+            val toB = Transition("next", from = a, to = b)
+            val cancelFromA = Transition("cancel", from = a, to = x)
+            val cancelFromB = Transition("cancel", from = b, to = x)
+            val machine = StateMachine(initialState = a, transitions = listOf(toB, cancelFromA, cancelFromB))
+            val fired = mutableListOf<String>()
+            machine.on(LifecycleEvent.OnTransition(cancelFromA)) { fired += "fromA" }
+            machine.on(LifecycleEvent.OnTransition(cancelFromB)) { fired += "fromB" }
+
+            machine.fire("next")
+            machine.fire("cancel")
+
+            assertEquals(listOf("fromB"), fired)
+            assertEquals(x, machine.currentState)
+        }
+
+    @Test
+    fun `firing an unknown name throws UnknownName and runs no observer`() =
+        runTest {
+            val machine = machine()
+            val order = mutableListOf<String>()
+            machine.recordLifecycle(order)
+
+            val error = assertFailsWith<TransitionError.UnknownName> { machine.fire("nope") }
+
+            assertEquals("nope", error.name)
+            assertEquals(draft, error.currentState)
+            assertEquals(draft, machine.currentState)
+            assertEquals(emptyList(), order)
+        }
+
+    @Test
+    fun `firing a name that does not leave the current state throws UnknownName`() =
+        runTest {
+            val machine = machine()
+            val order = mutableListOf<String>()
+            machine.recordLifecycle(order)
+            machine.on(LifecycleEvent.BeforeTransition(archive)) { order += "beforeArchive" }
+
+            val error = assertFailsWith<TransitionError.UnknownName> { machine.fire("archive") }
+
+            assertEquals("archive", error.name)
+            assertEquals(draft, error.currentState)
+            assertEquals(draft, machine.currentState)
+            assertEquals(emptyList(), order)
+        }
+
+    @Test
+    fun `transition named returns the transition leaving the current state or null`() =
+        runTest {
+            val machine = machine()
+
+            assertEquals(publish, machine.transition(named = "publish"))
+            assertNull(machine.transition(named = "archive"))
+        }
+
+    @Test
+    fun `fire by name honours the guard of the registered transition`() =
+        runTest {
+            val rejecting = guardedMachine { false }
+            val order = mutableListOf<String>()
+            rejecting.recordLifecycle(order)
+
+            val thrown = assertFailsWith<TransitionError.GuardRejected> { rejecting.fire("publish") }
+
+            assertEquals(publish, thrown.transition)
+            assertEquals(draft, rejecting.currentState)
+            assertEquals(emptyList(), order)
+
+            val needsUserInfo = guardedMachine { userInfo -> userInfo?.get("actor") == "editor" }
+            needsUserInfo.fire("publish", mapOf("actor" to "editor"))
+
+            assertEquals(published, needsUserInfo.currentState)
+        }
+
+    @Test
+    fun `fire by name from a handler of the same machine throws ReentrantFire`() =
+        runTest(timeout = 5.seconds) {
+            val machine = machine()
+            var nested: TransitionError.ReentrantFire? = null
+
+            machine.on(LifecycleEvent.OnState(published)) {
+                nested = assertFailsWith<TransitionError.ReentrantFire> { machine.fire("archive") }
+            }
+
+            machine.fire("publish")
+
+            assertEquals(archive, nested?.transition)
+            assertEquals(published, machine.currentState)
         }
 }

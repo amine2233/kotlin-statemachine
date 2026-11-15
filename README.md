@@ -38,12 +38,37 @@ fun main() = runBlocking {
 
 Firing a transition the machine does not know throws `TransitionError.Unknown`;
 firing one that does not start from the current state throws
-`TransitionError.NotAllowed`. Ask first with `canFire(transition)` or
-`allowedTransitions()` — the latter is what UI usually binds to, so buttons
-enable themselves from the graph.
+`TransitionError.NotAllowed`; firing one whose guard refuses it throws
+`TransitionError.GuardRejected` (see [Guarded transitions](#guarded-transitions)).
+Ask first with `canFire(transition, userInfo)` or `allowedTransitions()` — the latter is
+what UI usually binds to, so buttons enable themselves from the graph.
+
+The constructor checks the graph and throws `IllegalArgumentException` if:
+
+- two transitions have the same name and the same `from` state. Names only need
+  to be unique per source state, so one `cancel` may leave several states;
+- `initialState` is not the `from` or `to` of any transition. An empty
+  `transitions` list always fails this check.
 
 `machine.state` is a `StateFlow<State>` of the same cursor as `currentState`,
 for UI layers to collect.
+
+### Firing by name
+
+When all you have is a name — a deep link, a push notification or a server
+event — fire it directly. The machine looks the name up among the transitions
+leaving the current state:
+
+```kotlin
+machine.fire("publish", userInfo = mapOf("id" to "article-42"))
+```
+
+It goes through the same path as `fire(transition)`: the transition's guard,
+the lifecycle order, `ReentrantFire` from a handler and the one-at-a-time
+serialization all apply. If no transition with that name leaves the current
+state, it throws `TransitionError.UnknownName`, which carries the `name` and the
+`currentState`, and nothing moves or runs. To check first,
+`transition(named = "publish")` returns the matching transition or `null`.
 
 ### Observing the lifecycle
 
@@ -81,6 +106,41 @@ that must not interrupt the lifecycle should catch its own exceptions.
 - A `state` collector, even one on an unconfined dispatcher that runs inline
   when the cursor moves, may call back into the machine the same way.
 
+### Guarded transitions
+
+A transition can carry a `guard`: a suspending check that receives the same
+`userInfo` passed to `fire` and decides whether the move may happen.
+
+```kotlin
+val checkout =
+    Transition("checkout", from = browsing, to = paying, guard = { userInfo ->
+        (userInfo?.get("cart") as? List<*>).orEmpty().isNotEmpty()
+    })
+
+val machine = StateMachine(initialState = browsing, transitions = listOf(checkout))
+
+machine.canFire(checkout, userInfo = mapOf("cart" to emptyList<String>())) // false
+machine.fire(checkout, userInfo = mapOf("cart" to listOf("burger")))       // moves to paying
+```
+
+`fire` checks `Unknown`, then `NotAllowed`, then the guard. A guard that
+returns `false` makes `fire` throw `TransitionError.GuardRejected`: the state
+does not change and no handlers run. A guard that throws has its exception
+rethrown unchanged, also with no state change and no handlers.
+
+The guard that runs is always the one on the transition registered in the
+graph; guards take no part in equality, so an equal copy without a guard
+cannot get around it.
+
+`allowedTransitions()` stays structural and never evaluates guards;
+`canFire(transition, userInfo)` does.
+
+Guards run outside the state lock, like handlers, so a guard may read the
+machine: `currentState`, `isCurrent`, `canFire` and `allowedTransitions` all
+work from inside it. A guard evaluated by `fire` runs before any handler is
+called, so reads see the old state, and calling `fire` on the same machine from
+it throws `TransitionError.ReentrantFire`.
+
 ### Restoring a machine
 
 The graph is static; only the cursor moves. Save `currentState.name`, and pass
@@ -92,6 +152,9 @@ val machine = StateMachine(
     transitions = OrderWorkflow.transitions,
 )
 ```
+
+The restored state must belong to the graph: if no transition starts or ends
+there, construction throws `IllegalArgumentException`.
 
 ## Try the kiosk example
 
