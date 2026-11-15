@@ -49,13 +49,6 @@ kover {
 publishing {
     publications {
         withType<MavenPublication>().configureEach {
-            // Keep the JVM jar under the existing `statemachine` coordinates so plain Maven
-            // and Gradle JVM consumers are unaffected; the KMP root gets its own artifactId.
-            when (name) {
-                "jvm" -> artifactId = "statemachine"
-                "kotlinMultiplatform" -> artifactId = "statemachine-multiplatform"
-            }
-
             pom {
                 name.set("StateMachine")
                 description.set(
