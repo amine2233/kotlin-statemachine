@@ -94,6 +94,12 @@ sealed class TransitionError(
         val transition: Transition,
     ) : TransitionError("Transition '${transition.name}' was rejected by its guard.")
 
+    /** No transition called [name] leaves [currentState]. */
+    class UnknownName(
+        val name: String,
+        val currentState: State,
+    ) : TransitionError("No transition named '$name' leaves state '${currentState.name}'.")
+
     /** `fire` was called from a lifecycle handler of the same machine while a transition was running. */
     class ReentrantFire(
         val transition: Transition,
@@ -149,6 +155,13 @@ typealias LifecycleHandler = suspend (UserInfo?) -> Unit
  * The machine itself. Construct it with the full graph; from then on it only
  * exposes what the current state allows.
  *
+ * The constructor validates the graph and throws [IllegalArgumentException]
+ * when it is invalid:
+ * - two transitions share a name and a `from` state (names only need to be
+ *   unique per source state, so `cancel` may leave several states);
+ * - `initialState` is not the `from` or `to` of any transition, which also
+ *   rejects an empty `transitions` list.
+ *
  * ```
  * val draft = State("draft")
  * val published = State("published")
@@ -164,6 +177,28 @@ class StateMachine(
     initialState: State,
     private val transitions: List<Transition>,
 ) {
+    /*
+     * Validation runs once, here, so every later lookup can trust the graph:
+     * a name and a source state identify at most one transition, and the
+     * cursor always starts on a state the graph knows.
+     */
+    init {
+        val seen = mutableSetOf<Pair<State, String>>()
+        for (transition in transitions) {
+            require(seen.add(transition.from to transition.name)) {
+                "Duplicate transition '${transition.name}' from state '${transition.from.name}'."
+            }
+        }
+        require(transitions.any { it.from == initialState || it.to == initialState }) {
+            "Initial state '${initialState.name}' is not part of any transition."
+        }
+    }
+
+    private val transitionSet: Set<Transition> = transitions.toSet()
+
+    private val transitionsByName: Map<State, Map<String, Transition>> =
+        transitions.groupBy { it.from }.mapValues { (_, outgoing) -> outgoing.associateBy { it.name } }
+
     private val mutex = Mutex()
 
     private val fireMutex = Mutex()
@@ -218,7 +253,7 @@ class StateMachine(
         transition: Transition,
         userInfo: UserInfo? = null,
     ): Boolean {
-        val allowed = mutex.withLock { transitions.contains(transition) && transition.from == _state.value }
+        val allowed = mutex.withLock { transition in transitionSet && transition.from == _state.value }
         if (!allowed) return false
         return registered(transition).guard?.invoke(userInfo) ?: true
     }
@@ -234,6 +269,17 @@ class StateMachine(
     suspend fun allowedTransitions(): List<Transition> =
         mutex.withLock {
             transitions.filter { it.from == _state.value }
+        }
+
+    /**
+     * The transition called [named] that leaves [currentState], or `null` if
+     * there is none. Returns non-null exactly when `fire(named)` would find a
+     * transition to run. The returned instance is the one registered in the
+     * graph, guard included.
+     */
+    suspend fun transition(named: String): Transition? =
+        mutex.withLock {
+            outgoing(named)
         }
 
     /**
@@ -309,27 +355,71 @@ class StateMachine(
             throw TransitionError.ReentrantFire(transition)
         }
 
-        fireMutex.withLock {
-            val handlers =
-                mutex.withLock {
-                    if (!transitions.contains(transition)) {
-                        throw TransitionError.Unknown(transition)
-                    }
-                    if (transition.from != _state.value) {
-                        throw TransitionError.NotAllowed(transition, _state.value)
-                    }
+        fireResolved(userInfo) {
+            if (transition !in transitionSet) {
+                throw TransitionError.Unknown(transition)
+            }
+            if (transition.from != _state.value) {
+                throw TransitionError.NotAllowed(transition, _state.value)
+            }
+            registered(transition)
+        }
+    }
 
-                    TransitionHandlers(
-                        before = observers[LifecycleEvent.BeforeTransition(transition)],
-                        leave = observers[LifecycleEvent.LeaveState(transition.from)],
-                        onState = observers[LifecycleEvent.OnState(transition.to)],
-                        onTransition = observers[LifecycleEvent.OnTransition(transition)],
-                        after = observers[LifecycleEvent.AfterTransition(transition)],
-                    )
+    /**
+     * Fires the transition called [name] that leaves [currentState], for
+     * callers that only have a name — a deep link or a server event, say.
+     *
+     * Throws [TransitionError.UnknownName] if no transition with that name
+     * leaves [currentState], without moving the cursor or running any
+     * observer. Otherwise it behaves exactly like `fire(transition)` with the
+     * registered transition: same guard check and [TransitionError.GuardRejected],
+     * same lifecycle order, [userInfo] passing, veto and exception rules, and
+     * the same serialization. The lookup happens under the fire-only lock, so
+     * the state can't change between it and the move.
+     *
+     * Called from a lifecycle handler or guard of the same machine, it throws
+     * [TransitionError.ReentrantFire] carrying the transition the name resolves
+     * to from the state the handler sees, or [TransitionError.UnknownName] if
+     * the name resolves to nothing there.
+     */
+    suspend fun fire(
+        name: String,
+        userInfo: UserInfo? = null,
+    ) {
+        if (currentCoroutineContext()[firing] != null) {
+            throw TransitionError.ReentrantFire(mutex.withLock { outgoingOrThrow(name) })
+        }
+
+        fireResolved(userInfo) { outgoingOrThrow(name) }
+    }
+
+    /**
+     * The shared body of both `fire` overloads. [resolve] runs under both
+     * locks, throws when the transition can't fire from the current state and
+     * otherwise returns the registered instance; guard and handlers then run
+     * outside the state lock.
+     */
+    private suspend fun fireResolved(
+        userInfo: UserInfo?,
+        resolve: () -> Transition,
+    ) {
+        fireMutex.withLock {
+            val (transition, handlers) =
+                mutex.withLock {
+                    val transition = resolve()
+                    transition to
+                        TransitionHandlers(
+                            before = observers[LifecycleEvent.BeforeTransition(transition)],
+                            leave = observers[LifecycleEvent.LeaveState(transition.from)],
+                            onState = observers[LifecycleEvent.OnState(transition.to)],
+                            onTransition = observers[LifecycleEvent.OnTransition(transition)],
+                            after = observers[LifecycleEvent.AfterTransition(transition)],
+                        )
                 }
 
             withContext(firing) {
-                val guard = registered(transition).guard
+                val guard = transition.guard
                 if (guard != null && !guard(userInfo)) {
                     throw TransitionError.GuardRejected(transition)
                 }
@@ -346,7 +436,11 @@ class StateMachine(
         }
     }
 
-    private fun registered(transition: Transition): Transition = transitions.first { it == transition }
+    private fun registered(transition: Transition): Transition = transitionsByName.getValue(transition.from).getValue(transition.name)
+
+    private fun outgoing(name: String): Transition? = transitionsByName[_state.value]?.get(name)
+
+    private fun outgoingOrThrow(name: String): Transition = outgoing(name) ?: throw TransitionError.UnknownName(name, _state.value)
 
     private class TransitionHandlers(
         val before: LifecycleHandler?,
