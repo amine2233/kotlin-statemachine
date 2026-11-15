@@ -59,6 +59,11 @@ sealed class TransitionError(
  * like the Swift original — registering an observer is scoped to one state or
  * one transition, and a second registration for the same [LifecycleEvent]
  * replaces the first.
+ *
+ * [BeforeTransition] and [LeaveState] run before the state moves, so a handler
+ * for either can veto the transition by throwing. [OnState], [OnTransition] and
+ * [AfterTransition] run after the move and cannot undo it. In both cases the
+ * first handler that throws stops the remaining handlers of that lifecycle.
  */
 sealed class LifecycleEvent {
     data class BeforeTransition(
@@ -162,10 +167,22 @@ class StateMachine(
      *
      * Throws [TransitionError.Unknown] if [transition] isn't part of the
      * graph, or [TransitionError.NotAllowed] if it doesn't start from
-     * [currentState]. On success, every matching observer runs — in the
+     * [currentState]. Otherwise every matching observer runs — in the
      * fixed lifecycle order — and this call only returns once they've all
      * finished, so the machine's state is settled by the time the caller
      * continues.
+     *
+     * If an observer throws, the remaining observers are skipped and the
+     * exception reaches the caller unchanged:
+     * - a throw in [LifecycleEvent.BeforeTransition] or [LifecycleEvent.LeaveState]
+     *   vetoes the transition, so [currentState] stays where it was;
+     * - a throw in [LifecycleEvent.OnState], [LifecycleEvent.OnTransition] or
+     *   [LifecycleEvent.AfterTransition] happens after the move, so
+     *   [currentState] is already [Transition.to] and stays there.
+     *
+     * Either way the lock is released, so the machine stays usable: a vetoed
+     * transition can be fired again, and after a post-move throw the
+     * transitions out of the new state can be fired.
      */
     suspend fun fire(
         transition: Transition,
