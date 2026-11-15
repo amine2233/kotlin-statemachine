@@ -52,6 +52,12 @@ sealed class TransitionError(
             "Transition '${transition.name}' requires state '${transition.from.name}' " +
                 "but the machine is currently in '${currentState.name}'.",
         )
+
+    /** No transition called [name] leaves [currentState]. */
+    class UnknownName(
+        val name: String,
+        val currentState: State,
+    ) : TransitionError("No transition named '$name' leaves state '${currentState.name}'.")
 }
 
 /**
@@ -100,6 +106,13 @@ typealias LifecycleHandler = suspend (UserInfo?) -> Unit
  * The machine itself. Construct it with the full graph; from then on it only
  * exposes what the current state allows.
  *
+ * The constructor validates the graph and throws [IllegalArgumentException]
+ * when it is invalid:
+ * - two transitions share a name and a `from` state (names only need to be
+ *   unique per source state, so `cancel` may leave several states);
+ * - `initialState` is not the `from` or `to` of any transition, which also
+ *   rejects an empty `transitions` list.
+ *
  * ```
  * val draft = State("draft")
  * val published = State("published")
@@ -115,6 +128,28 @@ class StateMachine(
     initialState: State,
     private val transitions: List<Transition>,
 ) {
+    /*
+     * Validation runs once, here, so every later lookup can trust the graph:
+     * a name and a source state identify at most one transition, and the
+     * cursor always starts on a state the graph knows.
+     */
+    init {
+        val seen = mutableSetOf<Pair<State, String>>()
+        for (transition in transitions) {
+            require(seen.add(transition.from to transition.name)) {
+                "Duplicate transition '${transition.name}' from state '${transition.from.name}'."
+            }
+        }
+        require(transitions.any { it.from == initialState || it.to == initialState }) {
+            "Initial state '${initialState.name}' is not part of any transition."
+        }
+    }
+
+    private val transitionSet: Set<Transition> = transitions.toSet()
+
+    private val transitionsByName: Map<State, Map<String, Transition>> =
+        transitions.groupBy { it.from }.mapValues { (_, outgoing) -> outgoing.associateBy { it.name } }
+
     private val mutex = Mutex()
 
     private val _state = MutableStateFlow(initialState)
@@ -149,7 +184,7 @@ class StateMachine(
     /** Whether [transition] both exists and starts from [currentState]. */
     suspend fun canFire(transition: Transition): Boolean =
         mutex.withLock {
-            transitions.contains(transition) && transition.from == _state.value
+            transition in transitionSet && transition.from == _state.value
         }
 
     /**
@@ -159,6 +194,16 @@ class StateMachine(
     suspend fun allowedTransitions(): List<Transition> =
         mutex.withLock {
             transitions.filter { it.from == _state.value }
+        }
+
+    /**
+     * The transition called [named] that leaves [currentState], or `null` if
+     * there is none. Returns non-null exactly when `fire(named)` would find a
+     * transition to run.
+     */
+    suspend fun transition(named: String): Transition? =
+        mutex.withLock {
+            transitionsByName[_state.value]?.get(named)
         }
 
     /**
@@ -205,23 +250,55 @@ class StateMachine(
         userInfo: UserInfo? = null,
     ) {
         mutex.withLock {
-            if (!transitions.contains(transition)) {
+            if (transition !in transitionSet) {
                 throw TransitionError.Unknown(transition)
             }
             if (transition.from != _state.value) {
                 throw TransitionError.NotAllowed(transition, _state.value)
             }
 
-            val leavingState = _state.value
-
-            observers[LifecycleEvent.BeforeTransition(transition)]?.invoke(userInfo)
-            observers[LifecycleEvent.LeaveState(leavingState)]?.invoke(userInfo)
-
-            _state.value = transition.to
-
-            observers[LifecycleEvent.OnState(transition.to)]?.invoke(userInfo)
-            observers[LifecycleEvent.OnTransition(transition)]?.invoke(userInfo)
-            observers[LifecycleEvent.AfterTransition(transition)]?.invoke(userInfo)
+            runLifecycle(transition, userInfo)
         }
+    }
+
+    /**
+     * Fires the transition called [name] that leaves [currentState], for
+     * callers that only have a name — a deep link or a server event, say.
+     *
+     * Throws [TransitionError.UnknownName] if no transition with that name
+     * leaves [currentState], without moving the cursor or running any
+     * observer. Otherwise it behaves exactly like `fire(transition)`: same
+     * lifecycle order, same [userInfo] passing, same veto and exception rules.
+     * The lookup and the firing happen under one hold of the lock, so the
+     * state can't change in between.
+     */
+    suspend fun fire(
+        name: String,
+        userInfo: UserInfo? = null,
+    ) {
+        mutex.withLock {
+            val transition =
+                transitionsByName[_state.value]?.get(name)
+                    ?: throw TransitionError.UnknownName(name, _state.value)
+
+            runLifecycle(transition, userInfo)
+        }
+    }
+
+    /** Runs [transition]'s observers and moves the cursor. Callers must already hold [mutex]. */
+    private suspend fun runLifecycle(
+        transition: Transition,
+        userInfo: UserInfo?,
+    ) {
+        val leavingState = _state.value
+
+        observers[LifecycleEvent.BeforeTransition(transition)]?.invoke(userInfo)
+        observers[LifecycleEvent.LeaveState(leavingState)]?.invoke(userInfo)
+
+        _state.value = transition.to
+
+        observers[LifecycleEvent.OnState(transition.to)]?.invoke(userInfo)
+        observers[LifecycleEvent.OnTransition(transition)]?.invoke(userInfo)
+        observers[LifecycleEvent.AfterTransition(transition)]?.invoke(userInfo)
     }
 }

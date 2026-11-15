@@ -8,6 +8,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -271,5 +272,144 @@ class StateMachineTest {
             machine.fire(archive)
 
             assertEquals(archived, machine.currentState)
+        }
+
+    @Test
+    fun `a duplicate name from the same state throws IllegalArgumentException`() {
+        val a = State("a")
+        val b = State("b")
+        val c = State("c")
+
+        val error =
+            assertFailsWith<IllegalArgumentException> {
+                StateMachine(
+                    initialState = a,
+                    transitions = listOf(Transition("go", from = a, to = b), Transition("go", from = a, to = c)),
+                )
+            }
+
+        assertEquals("Duplicate transition 'go' from state 'a'.", error.message)
+    }
+
+    @Test
+    fun `an exact duplicate transition throws IllegalArgumentException`() {
+        assertFailsWith<IllegalArgumentException> {
+            StateMachine(initialState = draft, transitions = listOf(publish, archive, publish))
+        }
+    }
+
+    @Test
+    fun `an initial state outside the graph throws IllegalArgumentException`() {
+        val error =
+            assertFailsWith<IllegalArgumentException> {
+                StateMachine(initialState = State("nowhere"), transitions = listOf(publish, archive))
+            }
+
+        assertEquals("Initial state 'nowhere' is not part of any transition.", error.message)
+    }
+
+    @Test
+    fun `an empty transition list throws IllegalArgumentException`() {
+        assertFailsWith<IllegalArgumentException> {
+            StateMachine(initialState = draft, transitions = emptyList())
+        }
+    }
+
+    @Test
+    fun `the same name from different states is accepted`() =
+        runTest {
+            val a = State("a")
+            val b = State("b")
+            val x = State("x")
+            val cancelFromA = Transition("cancel", from = a, to = x)
+            val cancelFromB = Transition("cancel", from = b, to = x)
+
+            val machine = StateMachine(initialState = a, transitions = listOf(cancelFromA, cancelFromB))
+
+            assertEquals(listOf(cancelFromA), machine.allowedTransitions())
+        }
+
+    @Test
+    fun `fire by name moves the state and runs the observers in lifecycle order with the userInfo`() =
+        runTest {
+            val machine = machine()
+            val order = mutableListOf<String>()
+
+            machine.on(LifecycleEvent.BeforeTransition(publish)) { order += "before" }
+            machine.on(LifecycleEvent.LeaveState(draft)) { order += "leave" }
+            machine.on(LifecycleEvent.OnState(published)) { userInfo ->
+                order += "onState:${userInfo?.get("actor")}"
+            }
+            machine.on(LifecycleEvent.OnTransition(publish)) { order += "onTransition" }
+            machine.on(LifecycleEvent.AfterTransition(publish)) { order += "after" }
+
+            machine.fire("publish", mapOf("actor" to "editor"))
+
+            assertEquals(published, machine.currentState)
+            assertEquals(
+                listOf("before", "leave", "onState:editor", "onTransition", "after"),
+                order,
+            )
+        }
+
+    @Test
+    fun `a name used on several states resolves to the transition leaving the current state`() =
+        runTest {
+            val a = State("a")
+            val b = State("b")
+            val x = State("x")
+            val toB = Transition("next", from = a, to = b)
+            val cancelFromA = Transition("cancel", from = a, to = x)
+            val cancelFromB = Transition("cancel", from = b, to = x)
+            val machine = StateMachine(initialState = a, transitions = listOf(toB, cancelFromA, cancelFromB))
+            val fired = mutableListOf<String>()
+            machine.on(LifecycleEvent.OnTransition(cancelFromA)) { fired += "fromA" }
+            machine.on(LifecycleEvent.OnTransition(cancelFromB)) { fired += "fromB" }
+
+            machine.fire("next")
+            machine.fire("cancel")
+
+            assertEquals(listOf("fromB"), fired)
+            assertEquals(x, machine.currentState)
+        }
+
+    @Test
+    fun `firing an unknown name throws UnknownName and runs no observer`() =
+        runTest {
+            val machine = machine()
+            val order = mutableListOf<String>()
+            machine.recordLifecycle(order)
+
+            val error = assertFailsWith<TransitionError.UnknownName> { machine.fire("nope") }
+
+            assertEquals("nope", error.name)
+            assertEquals(draft, error.currentState)
+            assertEquals(draft, machine.currentState)
+            assertEquals(emptyList(), order)
+        }
+
+    @Test
+    fun `firing a name that does not leave the current state throws UnknownName`() =
+        runTest {
+            val machine = machine()
+            val order = mutableListOf<String>()
+            machine.recordLifecycle(order)
+            machine.on(LifecycleEvent.BeforeTransition(archive)) { order += "beforeArchive" }
+
+            val error = assertFailsWith<TransitionError.UnknownName> { machine.fire("archive") }
+
+            assertEquals("archive", error.name)
+            assertEquals(draft, error.currentState)
+            assertEquals(draft, machine.currentState)
+            assertEquals(emptyList(), order)
+        }
+
+    @Test
+    fun `transition named returns the transition leaving the current state or null`() =
+        runTest {
+            val machine = machine()
+
+            assertEquals(publish, machine.transition(named = "publish"))
+            assertNull(machine.transition(named = "archive"))
         }
 }
