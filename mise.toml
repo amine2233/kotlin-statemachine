@@ -23,7 +23,7 @@ description = "Run the unit tests."
 run = "./gradlew test --no-daemon"
 
 [tasks.test-coverage]
-description = "Run the unit tests with a Kover coverage report (requires the org.jetbrains.kotlinx.kover plugin)."
+description = "Run the unit tests with a Kover coverage report."
 run = "./gradlew test koverHtmlReport koverVerify --no-daemon"
 
 [tasks.format]
@@ -45,8 +45,8 @@ description = "Check the pull request title follows Conventional Commits."
 run = 'echo "${PR_TITLE?}" | npx --yes -p @commitlint/cli -p @commitlint/config-conventional commitlint --extends @commitlint/config-conventional'
 
 [tasks.build_documentations]
-description = "Build the API documentation with Dokka into build/dokka/html (requires the org.jetbrains.dokka plugin)."
-run = "./gradlew dokkaHtml --no-daemon"
+description = "Build the API documentation with Dokka into statemachine/build/dokka/html."
+run = "./gradlew :statemachine:dokkaGenerate --no-daemon"
 
 # Called by semantic-release (@semantic-release/exec publishCmd in .releaserc.json).
 [tasks.publish]

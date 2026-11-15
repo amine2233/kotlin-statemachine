@@ -132,7 +132,7 @@ val machine = StateMachine(
 ## Try the kiosk example
 
 ```
-gradle :sample-kiosk:run
+./gradlew :sample-kiosk:run
 ```
 
 See `sample-kiosk/src/main/kotlin/.../kiosk/KioskFoodOrderExample.kt` for a
@@ -142,9 +142,11 @@ collects the machine's `state` the way a Compose screen would.
 ## Development
 
 ```
-mise run test   # run the library's unit tests
-mise run lint   # ktlint
-mise run build  # compile everything
+mise run test                 # run the library's unit tests
+mise run test-coverage        # tests + Kover report in statemachine/build/reports/kover/html
+mise run build_documentations # Dokka API docs in statemachine/build/dokka/html
+mise run lint                 # ktlint
+mise run build                # compile everything
 ```
 
 ## CI/CD
