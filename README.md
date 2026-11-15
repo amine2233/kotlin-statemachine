@@ -42,6 +42,9 @@ firing one that does not start from the current state throws
 `allowedTransitions()` — the latter is what UI usually binds to, so buttons
 enable themselves from the graph.
 
+`machine.state` is a `StateFlow<State>` of the same cursor as `currentState`,
+for UI layers to collect.
+
 ### Observing the lifecycle
 
 One handler per lifecycle event. They run in a fixed order, and `fire` only
@@ -76,8 +79,8 @@ gradle :sample-kiosk:run
 ```
 
 See `sample-kiosk/src/main/kotlin/.../kiosk/KioskFoodOrderExample.kt` for a
-full ordering flow (`idle -> browsingMenu -> ... -> orderConfirmed`), wired to
-`StateFlow` the way a Compose screen would collect it.
+full ordering flow (`idle -> browsingMenu -> ... -> orderConfirmed`) that
+collects the machine's `state` the way a Compose screen would.
 
 ## Development
 
