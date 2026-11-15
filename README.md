@@ -57,6 +57,13 @@ machine.fire(publish, userInfo = mapOf("id" to "article-42"))
 
 `BeforeTransition -> LeaveState -> OnState -> OnTransition -> AfterTransition`.
 
+If a handler throws, `fire` rethrows that same exception and skips the handlers
+after it. A throw in `BeforeTransition` or `LeaveState` vetoes the transition:
+`currentState` stays where it was. A throw in `OnState`, `OnTransition` or
+`AfterTransition` happens after the move, so `currentState` is already the
+target state and stays there. Either way the machine stays usable. A handler
+that must not interrupt the lifecycle should catch its own exceptions.
+
 #### What handlers may do
 
 - Handlers may call `currentState`, `isCurrent`, `canFire`, `allowedTransitions`,

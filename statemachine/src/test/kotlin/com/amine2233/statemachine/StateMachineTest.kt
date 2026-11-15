@@ -8,6 +8,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
@@ -24,6 +25,16 @@ class StateMachineTest {
             initialState = draft,
             transitions = listOf(publish, archive),
         )
+
+    private class HandlerFailure : RuntimeException("handler failed")
+
+    private suspend fun StateMachine.recordLifecycle(order: MutableList<String>) {
+        on(LifecycleEvent.BeforeTransition(publish)) { order += "before" }
+        on(LifecycleEvent.LeaveState(draft)) { order += "leave" }
+        on(LifecycleEvent.OnState(published)) { order += "onState" }
+        on(LifecycleEvent.OnTransition(publish)) { order += "onTransition" }
+        on(LifecycleEvent.AfterTransition(publish)) { order += "after" }
+    }
 
     @Test
     fun `fire moves the cursor along a known transition`() =
@@ -125,6 +136,84 @@ class StateMachineTest {
                 )
 
             assertEquals(listOf(archive), resumed.allowedTransitions())
+        }
+
+    @Test
+    fun `a throw in BeforeTransition vetoes the transition and skips every later handler`() =
+        runTest {
+            val machine = machine()
+            val order = mutableListOf<String>()
+            val failure = HandlerFailure()
+            machine.recordLifecycle(order)
+            machine.on(LifecycleEvent.BeforeTransition(publish)) { throw failure }
+
+            val thrown = assertFailsWith<HandlerFailure> { machine.fire(publish) }
+
+            assertSame(failure, thrown)
+            assertEquals(draft, machine.currentState)
+            assertEquals(emptyList(), order)
+        }
+
+    @Test
+    fun `a throw in LeaveState vetoes the transition and skips the post-move handlers`() =
+        runTest {
+            val machine = machine()
+            val order = mutableListOf<String>()
+            val failure = HandlerFailure()
+            machine.recordLifecycle(order)
+            machine.on(LifecycleEvent.LeaveState(draft)) { throw failure }
+
+            val thrown = assertFailsWith<HandlerFailure> { machine.fire(publish) }
+
+            assertSame(failure, thrown)
+            assertEquals(draft, machine.currentState)
+            assertEquals(listOf("before"), order)
+        }
+
+    @Test
+    fun `a throw in OnState keeps the move and skips the remaining handlers`() =
+        runTest {
+            val machine = machine()
+            val order = mutableListOf<String>()
+            val failure = HandlerFailure()
+            machine.recordLifecycle(order)
+            machine.on(LifecycleEvent.OnState(published)) { throw failure }
+
+            val thrown = assertFailsWith<HandlerFailure> { machine.fire(publish) }
+
+            assertSame(failure, thrown)
+            assertEquals(published, machine.currentState)
+            assertEquals(listOf("before", "leave"), order)
+        }
+
+    @Test
+    fun `a vetoed transition can be fired again once the throwing handler is removed`() =
+        runTest {
+            val machine = machine()
+            machine.on(LifecycleEvent.LeaveState(draft)) { throw HandlerFailure() }
+            assertFailsWith<HandlerFailure> { machine.fire(publish) }
+
+            assertTrue(machine.canFire(publish))
+            assertEquals(listOf(publish), machine.allowedTransitions())
+
+            machine.off(LifecycleEvent.LeaveState(draft))
+            machine.fire(publish)
+
+            assertEquals(published, machine.currentState)
+        }
+
+    @Test
+    fun `transitions out of the new state can be fired after a post-move throw`() =
+        runTest {
+            val machine = machine()
+            machine.on(LifecycleEvent.OnState(published)) { throw HandlerFailure() }
+            assertFailsWith<HandlerFailure> { machine.fire(publish) }
+
+            assertEquals(listOf(archive), machine.allowedTransitions())
+
+            machine.fire(archive)
+
+            assertEquals(archived, machine.currentState)
         }
 
     @Test
