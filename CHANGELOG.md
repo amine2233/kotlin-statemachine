@@ -1,3 +1,21 @@
+## [2.0.0](https://github.com/amine2233/kotlin-statemachine/compare/v1.1.0...v2.0.0) (2026-11-15)
+
+### ⚠ BREAKING CHANGES
+
+* plain Maven consumers must depend on com.amine2233.statemachine:statemachine-jvm; Gradle consumers of com.amine2233.statemachine:statemachine are unaffected.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_011hCzH4ubWpeT3zy4qa3bTg
+
+* docs: explain the multiplatform publication layout and 1.x migration
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_011hCzH4ubWpeT3zy4qa3bTg
+
+### Features
+
+* add Kotlin Multiplatform targets (JVM, iOS, JS) ([#18](https://github.com/amine2233/kotlin-statemachine/issues/18)) ([a2032bc](https://github.com/amine2233/kotlin-statemachine/commit/a2032bcc8f545872b3af534d997cc5f7aa6eaf3a))
+
 ## [1.1.0](https://github.com/amine2233/kotlin-statemachine/compare/v1.0.0...v1.1.0) (2026-11-15)
 
 ### Features
