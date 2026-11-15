@@ -1,11 +1,15 @@
 package com.amine2233.statemachine
 
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
 
 class StateMachineTest {
     private val draft = State("draft")
@@ -121,5 +125,170 @@ class StateMachineTest {
                 )
 
             assertEquals(listOf(archive), resumed.allowedTransitions())
+        }
+
+    @Test
+    fun `an OnState handler can call allowedTransitions without deadlocking`() =
+        runTest(timeout = 5.seconds) {
+            val machine = machine()
+            var seen: List<Transition>? = null
+
+            machine.on(LifecycleEvent.OnState(published)) { seen = machine.allowedTransitions() }
+
+            machine.fire(publish)
+
+            assertEquals(listOf(archive), seen)
+        }
+
+    @Test
+    fun `handlers read the old state before the move and the new state after it`() =
+        runTest(timeout = 5.seconds) {
+            val machine = machine()
+            val reads = mutableListOf<String>()
+
+            machine.on(LifecycleEvent.BeforeTransition(publish)) {
+                reads += "before:${machine.canFire(publish)}:${machine.currentState}"
+            }
+            machine.on(LifecycleEvent.LeaveState(draft)) {
+                reads += "leave:${machine.allowedTransitions()}"
+            }
+            machine.on(LifecycleEvent.OnState(published)) {
+                reads += "onState:${machine.canFire(archive)}:${machine.currentState}"
+            }
+            machine.on(LifecycleEvent.AfterTransition(publish)) {
+                reads += "after:${machine.canFire(archive)}"
+            }
+
+            machine.fire(publish)
+
+            assertEquals(
+                listOf(
+                    "before:true:draft",
+                    "leave:${listOf(publish)}",
+                    "onState:true:published",
+                    "after:true",
+                ),
+                reads,
+            )
+        }
+
+    @Test
+    fun `on and off from a handler apply from the next fire`() =
+        runTest(timeout = 5.seconds) {
+            val unpublish = Transition("unpublish", from = published, to = draft)
+            val machine = StateMachine(initialState = draft, transitions = listOf(publish, unpublish))
+            val calls = mutableListOf<String>()
+
+            machine.on(LifecycleEvent.BeforeTransition(publish)) {
+                calls += "before"
+                machine.on(LifecycleEvent.OnTransition(publish)) { calls += "added" }
+                machine.off(LifecycleEvent.OnState(published))
+                machine.off(LifecycleEvent.BeforeTransition(publish))
+            }
+            machine.on(LifecycleEvent.OnState(published)) { calls += "removed" }
+
+            machine.fire(publish)
+
+            assertEquals(listOf("before", "removed"), calls)
+
+            calls.clear()
+            machine.fire(unpublish)
+            machine.fire(publish)
+
+            assertEquals(listOf("added"), calls)
+        }
+
+    @Test
+    fun `fire from a handler of the same machine throws ReentrantFire`() =
+        runTest(timeout = 5.seconds) {
+            val machine = machine()
+            var nested: TransitionError.ReentrantFire? = null
+
+            machine.on(LifecycleEvent.OnState(published)) {
+                nested = assertFailsWith<TransitionError.ReentrantFire> { machine.fire(archive) }
+            }
+
+            machine.fire(publish)
+
+            assertEquals(archive, nested?.transition)
+            assertEquals(published, machine.currentState)
+        }
+
+    @Test
+    fun `an uncaught ReentrantFire propagates and leaves the machine usable`() =
+        runTest(timeout = 5.seconds) {
+            val machine = machine()
+
+            machine.on(LifecycleEvent.OnState(published)) { machine.fire(archive) }
+
+            assertFailsWith<TransitionError.ReentrantFire> { machine.fire(publish) }
+
+            assertEquals(published, machine.currentState)
+            assertEquals(listOf(archive), machine.allowedTransitions())
+            machine.fire(archive)
+            assertEquals(archived, machine.currentState)
+        }
+
+    @Test
+    fun `fire from a handler of a different machine is not affected`() =
+        runTest(timeout = 5.seconds) {
+            val machine = machine()
+            val other = machine()
+
+            machine.on(LifecycleEvent.OnState(published)) { other.fire(publish) }
+
+            machine.fire(publish)
+
+            assertEquals(published, machine.currentState)
+            assertEquals(published, other.currentState)
+        }
+
+    @Test
+    fun `concurrent fires run one at a time`() =
+        runTest(timeout = 5.seconds) {
+            val machine = machine()
+            val log = mutableListOf<String>()
+
+            machine.on(LifecycleEvent.BeforeTransition(publish)) {
+                delay(10)
+                log += "publish:before"
+            }
+            machine.on(LifecycleEvent.LeaveState(draft)) {
+                yield()
+                log += "publish:leave"
+            }
+            machine.on(LifecycleEvent.OnState(published)) {
+                delay(10)
+                log += "publish:onState"
+            }
+            machine.on(LifecycleEvent.OnTransition(publish)) {
+                yield()
+                log += "publish:onTransition"
+            }
+            machine.on(LifecycleEvent.AfterTransition(publish)) {
+                delay(10)
+                log += "publish:after"
+            }
+            machine.on(LifecycleEvent.BeforeTransition(archive)) { log += "archive:before" }
+            machine.on(LifecycleEvent.AfterTransition(archive)) { log += "archive:after" }
+
+            val first = launch { machine.fire(publish) }
+            val second = launch { machine.fire(archive) }
+            first.join()
+            second.join()
+
+            assertEquals(
+                listOf(
+                    "publish:before",
+                    "publish:leave",
+                    "publish:onState",
+                    "publish:onTransition",
+                    "publish:after",
+                    "archive:before",
+                    "archive:after",
+                ),
+                log,
+            )
+            assertEquals(archived, machine.currentState)
         }
 }
