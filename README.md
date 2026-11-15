@@ -68,6 +68,20 @@ after it. A throw in `BeforeTransition` or `LeaveState` vetoes the transition:
 target state and stays there. Either way the machine stays usable. A handler
 that must not interrupt the lifecycle should catch its own exceptions.
 
+#### What handlers may do
+
+- Handlers may call `currentState`, `isCurrent`, `canFire`, `allowedTransitions`,
+  `on` and `off` on the machine that runs them.
+- Reads see the old state in `BeforeTransition` and `LeaveState`, and the new
+  state from `OnState` onwards.
+- `on`/`off` called from a handler apply from the next `fire`, never to the
+  transition in progress.
+- Calling `fire` on the same machine from a handler throws
+  `TransitionError.ReentrantFire`.
+- Concurrent `fire` calls from different coroutines still run one at a time.
+- A `state` collector, even one on an unconfined dispatcher that runs inline
+  when the cursor moves, may call back into the machine the same way.
+
 ### Guarded transitions
 
 A transition can carry a `guard`: a suspending check that receives the same
@@ -95,9 +109,13 @@ graph; guards take no part in equality, so an equal copy without a guard
 cannot get around it.
 
 `allowedTransitions()` stays structural and never evaluates guards;
-`canFire(transition, userInfo)` does. Guards run while the machine holds its
-lock, so a guard must not call back into the same machine (`fire`, `canFire`,
-`allowedTransitions`, `on`, `off`). Reading `currentState` is fine.
+`canFire(transition, userInfo)` does.
+
+Guards run outside the state lock, like handlers, so a guard may read the
+machine: `currentState`, `isCurrent`, `canFire` and `allowedTransitions` all
+work from inside it. A guard evaluated by `fire` runs before any handler is
+called, so reads see the old state, and calling `fire` on the same machine from
+it throws `TransitionError.ReentrantFire`.
 
 ### Restoring a machine
 
