@@ -1,6 +1,9 @@
 package com.amine2233.statemachine
 
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -17,9 +20,9 @@ import kotlin.coroutines.CoroutineContext
  * The Swift version is isolated by an `actor`; Kotlin has no actor keyword,
  * so the same "only one caller mutates state at a time" guarantee is
  * reproduced with a [Mutex] and suspend functions. The lock covers only
- * reading and mutating the cursor and the handler map; lifecycle handlers run
- * outside it, so they may call back into the machine. A second, fire-only
- * lock keeps `fire` calls serialized.
+ * short reads and the handler map; lifecycle handlers and the cursor write run
+ * outside it, so handlers and state collectors may call back into the machine.
+ * A second, fire-only lock keeps `fire` calls, and so cursor writes, serialized.
  */
 
 /** A named node in the graph. Two states are equal when their names match. */
@@ -132,26 +135,42 @@ class StateMachine(
 
     private val firing = FiringElement()
 
-    @Volatile
-    private var current: State = initialState
+    private val _state = MutableStateFlow(initialState)
 
     private val observers = mutableMapOf<LifecycleEvent, LifecycleHandler>()
 
     /**
-     * The machine's cursor. Safe to read from any thread without suspending —
-     * writes only ever happen while [mutex] is held, so this is always one of
-     * the graph's states, never a torn value.
+     * The machine's cursor as a [StateFlow], for UI layers to collect.
+     *
+     * Its initial value is the `initialState` passed to the constructor. It is
+     * updated by [fire] under the fire-only lock but outside [mutex], after the
+     * [LifecycleEvent.LeaveState] handlers and before the [LifecycleEvent.OnState]
+     * handlers run. A collector that runs inline on that write (for example on
+     * an unconfined dispatcher) may call back into the machine: reads work
+     * immediately, and a [fire] waits until the running one has returned.
+     *
+     * Like any [StateFlow] it is conflated: a collector that keeps up (for
+     * example one on an unconfined dispatcher) sees every state in order, but a
+     * slow collector may miss intermediate states. A transition into a state
+     * equal to the current one emits nothing.
+     */
+    val state: StateFlow<State> = _state.asStateFlow()
+
+    /**
+     * The machine's cursor, the current value of [state]. Safe to read from any
+     * thread without suspending — writes only ever happen inside [fire], one at
+     * a time, so this is always one of the graph's states, never a torn value.
      */
     val currentState: State
-        get() = current
+        get() = _state.value
 
     /** Equivalent to `currentState == state`, spelled out for readability at call sites. */
-    fun isCurrent(state: State): Boolean = current == state
+    fun isCurrent(state: State): Boolean = _state.value == state
 
     /** Whether [transition] both exists and starts from [currentState]. */
     suspend fun canFire(transition: Transition): Boolean =
         mutex.withLock {
-            transitions.contains(transition) && transition.from == current
+            transitions.contains(transition) && transition.from == _state.value
         }
 
     /**
@@ -160,7 +179,7 @@ class StateMachine(
      */
     suspend fun allowedTransitions(): List<Transition> =
         mutex.withLock {
-            transitions.filter { it.from == current }
+            transitions.filter { it.from == _state.value }
         }
 
     /**
@@ -230,8 +249,8 @@ class StateMachine(
                     if (!transitions.contains(transition)) {
                         throw TransitionError.Unknown(transition)
                     }
-                    if (transition.from != current) {
-                        throw TransitionError.NotAllowed(transition, current)
+                    if (transition.from != _state.value) {
+                        throw TransitionError.NotAllowed(transition, _state.value)
                     }
 
                     TransitionHandlers(
@@ -247,7 +266,7 @@ class StateMachine(
                 handlers.before?.invoke(userInfo)
                 handlers.leave?.invoke(userInfo)
 
-                mutex.withLock { current = transition.to }
+                _state.value = transition.to
 
                 handlers.onState?.invoke(userInfo)
                 handlers.onTransition?.invoke(userInfo)

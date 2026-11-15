@@ -82,7 +82,8 @@ object KioskOrderWorkflow {
 }
 
 /**
- * Wraps a [StateMachine] with kiosk-specific vocabulary and a [StateFlow] so
+ * Wraps a [StateMachine] with kiosk-specific vocabulary, exposing the
+ * machine's [StateMachine.state] plus a [StateFlow] of actions so
  * a Compose screen (or any Android UI layer) can collect the current state
  * and the buttons it should show, without touching [StateMachine] directly.
  *
@@ -102,8 +103,7 @@ class KioskOrderSession(
             transitions = KioskOrderWorkflow.transitions,
         )
 
-    private val _screen = MutableStateFlow(machine.currentState)
-    val screen: StateFlow<State> = _screen.asStateFlow()
+    val screen: StateFlow<State> = machine.state
 
     private val _availableActions = MutableStateFlow<List<Transition>>(emptyList())
     val availableActions: StateFlow<List<Transition>> = _availableActions.asStateFlow()
@@ -143,7 +143,6 @@ class KioskOrderSession(
     ): Boolean =
         try {
             machine.fire(transition, userInfo)
-            _screen.value = machine.currentState
             refreshAvailableActions()
             true
         } catch (e: TransitionError.NotAllowed) {
