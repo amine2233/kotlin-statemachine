@@ -275,17 +275,20 @@ All logic lives in `mise.toml`:
 
 ### Consuming the published package
 
-Every target is published under the `com.amine2233.statemachine` group:
+`statemachine` is published with the standard Kotlin Multiplatform layout under
+one coordinate, `com.amine2233.statemachine:statemachine`. Its Gradle Module
+Metadata points each consumer at the right per-platform artifact, so Gradle
+users never name a platform artifact themselves:
 
 | artifactId | contents |
 | --- | --- |
-| `statemachine` | the JVM jar, as before |
-| `statemachine-multiplatform` | the Kotlin Multiplatform root (common metadata) |
-| `statemachine-js` | the JS (IR) klib |
+| `statemachine` | the root module: Gradle Module Metadata and common metadata |
+| `statemachine-jvm` | the JVM jar (JVM 17+, also picked by Android projects) |
+| `statemachine-js` | the JS (IR, Node.js) klib |
 | `statemachine-iosarm64` | the `iosArm64` klib |
 | `statemachine-iossimulatorarm64` | the `iosSimulatorArm64` klib |
 
-From another Gradle project:
+Add the GitHub Packages repository to the consuming Gradle project:
 
 ```kotlin
 repositories {
@@ -297,29 +300,49 @@ repositories {
         }
     }
 }
+```
 
+A JVM-only Gradle project depends on the root coordinate and gets the JVM jar:
+
+```kotlin
 dependencies {
-    implementation("com.amine2233.statemachine:statemachine:1.0.0")
+    implementation("com.amine2233.statemachine:statemachine:2.0.0")
 }
 ```
 
-JVM projects, Gradle or plain Maven, keep depending on
-`com.amine2233.statemachine:statemachine`; nothing changes for them. A Kotlin
-Multiplatform project depends on the root module from `commonMain`, and Gradle
-picks the right per-target artifact:
+A Kotlin Multiplatform project uses the same coordinate from `commonMain`, and
+each target resolves its own artifact:
 
 ```kotlin
 kotlin {
     sourceSets {
         commonMain.dependencies {
-            implementation("com.amine2233.statemachine:statemachine-multiplatform:1.0.0")
+            implementation("com.amine2233.statemachine:statemachine:2.0.0")
         }
     }
 }
 ```
 
+Plain Maven does not read Gradle Module Metadata, so Maven projects depend on
+the JVM artifact directly:
+
+```xml
+<dependency>
+    <groupId>com.amine2233.statemachine</groupId>
+    <artifactId>statemachine-jvm</artifactId>
+    <version>2.0.0</version>
+</dependency>
+```
+
 No XCFramework, Swift Package Manager or CocoaPods packaging is provided; iOS
 code consumes the klibs from a Kotlin Multiplatform project.
+
+#### Migrating from 1.x
+
+- Gradle: bump the version to `2.0.0`; the coordinate stays
+  `com.amine2233.statemachine:statemachine`.
+- Maven: change the `artifactId` from `statemachine` to `statemachine-jvm` and
+  bump the version to `2.0.0`.
 
 GitHub Packages requires authentication even for public read access — the
 consumer needs a personal access token with `read:packages` scope.
