@@ -1,5 +1,8 @@
 package com.amine2233.statemachine
 
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -132,6 +135,64 @@ class StateMachineTest {
                 )
 
             assertEquals(listOf(archive), resumed.allowedTransitions())
+        }
+
+    // StateFlow is conflated: these ordering checks hold because the collector
+    // runs on an unconfined dispatcher and so keeps up with every emission.
+    @Test
+    fun `state emits every state in order to a collector that keeps up`() =
+        runTest {
+            val machine = machine()
+            val seen = mutableListOf<State>()
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { machine.state.toList(seen) }
+
+            machine.fire(publish)
+            machine.fire(archive)
+
+            assertEquals(listOf(draft, published, archived), seen)
+        }
+
+    @Test
+    fun `state value always agrees with currentState`() =
+        runTest {
+            val machine = machine()
+
+            assertEquals(machine.currentState, machine.state.value)
+            machine.fire(publish)
+            assertEquals(machine.currentState, machine.state.value)
+            machine.fire(archive)
+            assertEquals(machine.currentState, machine.state.value)
+        }
+
+    @Test
+    fun `rejected transitions emit nothing to a collector that keeps up`() =
+        runTest {
+            val machine = machine()
+            val seen = mutableListOf<State>()
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { machine.state.toList(seen) }
+            val foreign = Transition("foreign", from = draft, to = archived)
+
+            assertFailsWith<TransitionError.NotAllowed> { machine.fire(archive) }
+            assertFailsWith<TransitionError.Unknown> { machine.fire(foreign) }
+
+            assertEquals(listOf(draft), seen)
+            assertEquals(draft, machine.state.value)
+        }
+
+    @Test
+    fun `state still holds the old state in LeaveState and the new one in OnState`() =
+        runTest {
+            val machine = machine()
+            var duringLeave: State? = null
+            var duringOnState: State? = null
+
+            machine.on(LifecycleEvent.LeaveState(draft)) { duringLeave = machine.state.value }
+            machine.on(LifecycleEvent.OnState(published)) { duringOnState = machine.state.value }
+
+            machine.fire(publish)
+
+            assertEquals(draft, duringLeave)
+            assertEquals(published, duringOnState)
         }
 
     @Test

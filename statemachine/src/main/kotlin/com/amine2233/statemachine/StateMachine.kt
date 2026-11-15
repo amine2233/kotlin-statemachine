@@ -1,5 +1,8 @@
 package com.amine2233.statemachine
 
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -145,21 +148,34 @@ class StateMachine(
 ) {
     private val mutex = Mutex()
 
-    @Volatile
-    private var current: State = initialState
+    private val _state = MutableStateFlow(initialState)
 
     private val observers = mutableMapOf<LifecycleEvent, LifecycleHandler>()
 
     /**
-     * The machine's cursor. Safe to read from any thread without suspending —
-     * writes only ever happen while [mutex] is held, so this is always one of
-     * the graph's states, never a torn value.
+     * The machine's cursor as a [StateFlow], for UI layers to collect.
+     *
+     * Its initial value is the `initialState` passed to the constructor. It is
+     * updated while [mutex] is held, after the [LifecycleEvent.LeaveState]
+     * handlers and before the [LifecycleEvent.OnState] handlers run.
+     *
+     * Like any [StateFlow] it is conflated: a collector that keeps up (for
+     * example one on an unconfined dispatcher) sees every state in order, but a
+     * slow collector may miss intermediate states. A transition into a state
+     * equal to the current one emits nothing.
+     */
+    val state: StateFlow<State> = _state.asStateFlow()
+
+    /**
+     * The machine's cursor, the current value of [state]. Safe to read from any
+     * thread without suspending — writes only ever happen while [mutex] is held,
+     * so this is always one of the graph's states, never a torn value.
      */
     val currentState: State
-        get() = current
+        get() = _state.value
 
     /** Equivalent to `currentState == state`, spelled out for readability at call sites. */
-    fun isCurrent(state: State): Boolean = current == state
+    fun isCurrent(state: State): Boolean = _state.value == state
 
     /**
      * Whether [transition] exists, starts from [currentState] and, if the
@@ -177,7 +193,7 @@ class StateMachine(
         userInfo: UserInfo? = null,
     ): Boolean =
         mutex.withLock {
-            if (!transitions.contains(transition) || transition.from != current) {
+            if (!transitions.contains(transition) || transition.from != _state.value) {
                 return@withLock false
             }
             registered(transition).guard?.invoke(userInfo) ?: true
@@ -193,7 +209,7 @@ class StateMachine(
      */
     suspend fun allowedTransitions(): List<Transition> =
         mutex.withLock {
-            transitions.filter { it.from == current }
+            transitions.filter { it.from == _state.value }
         }
 
     /**
@@ -253,22 +269,22 @@ class StateMachine(
             if (!transitions.contains(transition)) {
                 throw TransitionError.Unknown(transition)
             }
-            if (transition.from != current) {
-                throw TransitionError.NotAllowed(transition, current)
+            if (transition.from != _state.value) {
+                throw TransitionError.NotAllowed(transition, _state.value)
             }
             val guard = registered(transition).guard
             if (guard != null && !guard(userInfo)) {
                 throw TransitionError.GuardRejected(transition)
             }
 
-            val leavingState = current
+            val leavingState = _state.value
 
             observers[LifecycleEvent.BeforeTransition(transition)]?.invoke(userInfo)
             observers[LifecycleEvent.LeaveState(leavingState)]?.invoke(userInfo)
 
-            current = transition.to
+            _state.value = transition.to
 
-            observers[LifecycleEvent.OnState(current)]?.invoke(userInfo)
+            observers[LifecycleEvent.OnState(transition.to)]?.invoke(userInfo)
             observers[LifecycleEvent.OnTransition(transition)]?.invoke(userInfo)
             observers[LifecycleEvent.AfterTransition(transition)]?.invoke(userInfo)
         }
