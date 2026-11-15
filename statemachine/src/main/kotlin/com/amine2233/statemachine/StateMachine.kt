@@ -43,23 +43,25 @@ data class State(
  * on the same machine; reading [StateMachine.currentState] is fine. An
  * exception thrown by a guard reaches the caller unchanged.
  */
-data class Transition(
-    val name: String,
-    val from: State,
-    val to: State,
-    val guard: (suspend (UserInfo?) -> Boolean)? = null,
-) {
-    override fun equals(other: Any?): Boolean = other is Transition && name == other.name && from == other.from && to == other.to
+data class Transition
+    @JvmOverloads
+    constructor(
+        val name: String,
+        val from: State,
+        val to: State,
+        val guard: (suspend (UserInfo?) -> Boolean)? = null,
+    ) {
+        override fun equals(other: Any?): Boolean = other is Transition && name == other.name && from == other.from && to == other.to
 
-    override fun hashCode(): Int {
-        var result = name.hashCode()
-        result = 31 * result + from.hashCode()
-        result = 31 * result + to.hashCode()
-        return result
+        override fun hashCode(): Int {
+            var result = name.hashCode()
+            result = 31 * result + from.hashCode()
+            result = 31 * result + to.hashCode()
+            return result
+        }
+
+        override fun toString(): String = "$name (${from.name} -> ${to.name})"
     }
-
-    override fun toString(): String = "$name (${from.name} -> ${to.name})"
-}
 
 /** Mirrors Swift's `TransitionError`. */
 sealed class TransitionError(
@@ -188,6 +190,7 @@ class StateMachine(
      * [canFire], [allowedTransitions], [on] or [off] on this machine; reading
      * [currentState] is fine. Never moves the cursor and never runs a handler.
      */
+    @JvmOverloads
     suspend fun canFire(
         transition: Transition,
         userInfo: UserInfo? = null,
