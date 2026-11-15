@@ -19,12 +19,12 @@ description = "Compile everything and run all checks."
 run = "./gradlew build --no-daemon"
 
 [tasks.test]
-description = "Run the unit tests and the ABI check."
-run = "./gradlew test checkKotlinAbi --no-daemon"
+description = "Run the library tests on every target the host supports (JVM, JS; iOS simulator on macOS), the sample's tests and the ABI check."
+run = "./gradlew :statemachine:allTests :sample-kiosk:test checkKotlinAbi --no-daemon"
 
 [tasks.test-coverage]
-description = "Run the unit tests with a Kover coverage report."
-run = "./gradlew test koverHtmlReport koverVerify --no-daemon"
+description = "Run the same tests as `test` plus a Kover coverage report and verification on the JVM tests."
+run = "./gradlew :statemachine:allTests :sample-kiosk:test koverHtmlReport koverVerify --no-daemon"
 
 [tasks.format]
 description = "Format Kotlin sources with ktlint."
