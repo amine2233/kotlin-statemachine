@@ -2,6 +2,8 @@ plugins {
     kotlin("jvm")
     `java-library`
     `maven-publish`
+    alias(libs.plugins.kover)
+    alias(libs.plugins.dokka)
 }
 
 dependencies {
@@ -21,6 +23,16 @@ java {
 
 tasks.test {
     useJUnitPlatform()
+}
+
+kover {
+    reports {
+        verify {
+            rule {
+                minBound(80)
+            }
+        }
+    }
 }
 
 publishing {
