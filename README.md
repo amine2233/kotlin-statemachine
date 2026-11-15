@@ -10,13 +10,14 @@ string.
 
 ## Modules
 
-- `statemachine` — the library (published to GitHub Packages).
+- `statemachine` — the library, a Kotlin Multiplatform module (published to GitHub Packages).
 - `sample-kiosk` — a runnable kiosk food-ordering example built on top of it.
 
 ## Requirements
 
 - JDK 17+
 - Kotlin 2.0 / kotlinx-coroutines 1.8
+- Targets: JVM (17+), `iosArm64`, `iosSimulatorArm64` and JS (IR) on Node.js
 
 ## Usage
 
@@ -240,17 +241,22 @@ collects the machine's `state` the way a Compose screen would.
 ## Development
 
 ```
-mise run test                 # run the library's unit tests and the ABI check
+mise run test                 # library tests on every host-supported target, sample tests, ABI check
 mise run test-coverage        # tests + Kover report in statemachine/build/reports/kover/html
 mise run build_documentations # Dokka API docs in statemachine/build/dokka/html
 mise run lint                 # ktlint
 mise run build                # compile everything
 ```
 
-The public API is guarded by explicit API mode and a committed ABI dump in
-`statemachine/api/`. `mise run test` and `./gradlew build` fail when the dump
+`mise run test` runs the JVM and JS tests everywhere and the iOS simulator
+tests only on macOS. CI runs on Linux, so it does not run the iOS tests yet;
+run them locally on a Mac.
+
+The public API is guarded by explicit API mode and committed ABI dumps in
+`statemachine/api/`: `statemachine.api` for the JVM and `statemachine.klib.api`
+for the iOS and JS klibs. `mise run test` and `./gradlew build` fail when the dump
 is stale. After an intentional API change, run
-`./gradlew :statemachine:updateKotlinAbi` and commit the updated dump. An
+`./gradlew :statemachine:updateKotlinAbi` and commit the updated dumps. An
 incompatible change (a removed or changed signature) needs a `feat!:` commit or
 a `BREAKING CHANGE:` footer so semantic-release bumps the major version.
 
@@ -261,11 +267,21 @@ All logic lives in `mise.toml`:
 
 - `mise run test` / `mise run lint` — what the `CI` workflow runs on pull requests.
 - Merging a `feat:` / `fix:` commit into `main` runs semantic-release: it tags
-  `vX.Y.Z`, updates `CHANGELOG.md`, publishes `com.amine2233.statemachine:statemachine`
-  to GitHub Packages and creates the GitHub release with the jars attached.
+  `vX.Y.Z`, updates `CHANGELOG.md`, publishes the `com.amine2233.statemachine`
+  artifacts to GitHub Packages and creates the GitHub release with the jars attached.
 - `mise run release --dry-run` previews the next version locally.
 
 ### Consuming the published package
+
+Every target is published under the `com.amine2233.statemachine` group:
+
+| artifactId | contents |
+| --- | --- |
+| `statemachine` | the JVM jar, as before |
+| `statemachine-multiplatform` | the Kotlin Multiplatform root (common metadata) |
+| `statemachine-js` | the JS (IR) klib |
+| `statemachine-iosarm64` | the `iosArm64` klib |
+| `statemachine-iossimulatorarm64` | the `iosSimulatorArm64` klib |
 
 From another Gradle project:
 
@@ -284,6 +300,24 @@ dependencies {
     implementation("com.amine2233.statemachine:statemachine:1.0.0")
 }
 ```
+
+JVM projects, Gradle or plain Maven, keep depending on
+`com.amine2233.statemachine:statemachine`; nothing changes for them. A Kotlin
+Multiplatform project depends on the root module from `commonMain`, and Gradle
+picks the right per-target artifact:
+
+```kotlin
+kotlin {
+    sourceSets {
+        commonMain.dependencies {
+            implementation("com.amine2233.statemachine:statemachine-multiplatform:1.0.0")
+        }
+    }
+}
+```
+
+No XCFramework, Swift Package Manager or CocoaPods packaging is provided; iOS
+code consumes the klibs from a Kotlin Multiplatform project.
 
 GitHub Packages requires authentication even for public read access — the
 consumer needs a personal access token with `read:packages` scope.
