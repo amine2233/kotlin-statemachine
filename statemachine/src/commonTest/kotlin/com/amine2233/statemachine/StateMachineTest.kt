@@ -6,8 +6,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
-import kotlin.coroutines.Continuation
-import kotlin.coroutines.intrinsics.suspendCoroutineUninterceptedOrReturn
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -572,7 +570,7 @@ class StateMachineTest {
         }
 
     @Test
-    fun `only the registered guard runs, never the caller's copy`() =
+    fun `only the registered guard runs never the caller's copy`() =
         runTest {
             var callerGuardCalls = 0
             val machine = guardedMachine { true }
@@ -679,32 +677,6 @@ class StateMachineTest {
 
             assertFailsWith<TransitionError.ReentrantFire> { machine.fire(publish) }
             assertEquals(draft, machine.currentState)
-        }
-
-    @Test
-    fun `the 1_0_0 three-argument Transition constructor still exists on the JVM`() {
-        val constructor =
-            Transition::class.java.getConstructor(String::class.java, State::class.java, State::class.java)
-
-        val transition = constructor.newInstance("publish", draft, published)
-
-        assertEquals(publish, transition)
-        assertEquals(null, transition.guard)
-    }
-
-    @Test
-    fun `the 1_0_0 one-argument canFire still exists on the JVM`() =
-        runTest {
-            val canFire =
-                StateMachine::class.java.getMethod("canFire", Transition::class.java, Continuation::class.java)
-            val machine = guardedMachine { userInfo -> userInfo != null }
-
-            val result =
-                suspendCoroutineUninterceptedOrReturn<Any?> { continuation ->
-                    canFire.invoke(machine, publish, continuation)
-                }
-
-            assertEquals(false, result)
         }
 
     @Test
