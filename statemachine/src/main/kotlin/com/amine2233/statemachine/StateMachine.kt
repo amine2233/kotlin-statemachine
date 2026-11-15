@@ -23,12 +23,38 @@ data class State(
     override fun toString(): String = name
 }
 
-/** A named edge: firing it moves the machine from [from] to [to]. */
+/**
+ * A named edge: firing it moves the machine from [from] to [to].
+ *
+ * An optional [guard] can refuse the move at fire time. It takes no part in
+ * equality, hashing or [toString]: two transitions with the same [name],
+ * [from] and [to] are the same edge whatever their guards. The machine only
+ * ever evaluates the guard of the instance registered in its graph, never the
+ * one on the instance passed to [StateMachine.fire] or [StateMachine.canFire],
+ * so an equal copy without a guard cannot get around it.
+ *
+ * A guard runs while the machine holds its lock, after the
+ * [TransitionError.Unknown] and [TransitionError.NotAllowed] checks and before
+ * any handler. It must not call [StateMachine.fire], [StateMachine.canFire],
+ * [StateMachine.allowedTransitions], [StateMachine.on] or [StateMachine.off]
+ * on the same machine; reading [StateMachine.currentState] is fine. An
+ * exception thrown by a guard reaches the caller unchanged.
+ */
 data class Transition(
     val name: String,
     val from: State,
     val to: State,
+    val guard: (suspend (UserInfo?) -> Boolean)? = null,
 ) {
+    override fun equals(other: Any?): Boolean = other is Transition && name == other.name && from == other.from && to == other.to
+
+    override fun hashCode(): Int {
+        var result = name.hashCode()
+        result = 31 * result + from.hashCode()
+        result = 31 * result + to.hashCode()
+        return result
+    }
+
     override fun toString(): String = "$name (${from.name} -> ${to.name})"
 }
 
@@ -49,6 +75,11 @@ sealed class TransitionError(
             "Transition '${transition.name}' requires state '${transition.from.name}' " +
                 "but the machine is currently in '${currentState.name}'.",
         )
+
+    /** [transition] is allowed from the current state but its guard returned `false`. */
+    class GuardRejected(
+        val transition: Transition,
+    ) : TransitionError("Transition '${transition.name}' was rejected by its guard.")
 }
 
 /**
@@ -130,15 +161,35 @@ class StateMachine(
     /** Equivalent to `currentState == state`, spelled out for readability at call sites. */
     fun isCurrent(state: State): Boolean = current == state
 
-    /** Whether [transition] both exists and starts from [currentState]. */
-    suspend fun canFire(transition: Transition): Boolean =
+    /**
+     * Whether [transition] exists, starts from [currentState] and, if the
+     * registered instance has a guard, that guard returns `true` for [userInfo].
+     *
+     * The checks run in the same order as [fire], and the guard evaluated is
+     * the one on the transition registered in the graph, not the one on
+     * [transition]. A guard exception reaches the caller unchanged. Guards run
+     * while the machine holds its lock, so a guard must not call [fire],
+     * [canFire], [allowedTransitions], [on] or [off] on this machine; reading
+     * [currentState] is fine. Never moves the cursor and never runs a handler.
+     */
+    suspend fun canFire(
+        transition: Transition,
+        userInfo: UserInfo? = null,
+    ): Boolean =
         mutex.withLock {
-            transitions.contains(transition) && transition.from == current
+            if (!transitions.contains(transition) || transition.from != current) {
+                return@withLock false
+            }
+            registered(transition).guard?.invoke(userInfo) ?: true
         }
 
     /**
      * Transitions that could fire right now. This is what UI usually binds
      * to — buttons enable themselves from the graph.
+     *
+     * The answer is structural: guards are not evaluated, so a listed
+     * transition may still be rejected by its guard. Use
+     * [canFire] (`canFire(transition, userInfo)`) for the guarded answer.
      */
     suspend fun allowedTransitions(): List<Transition> =
         mutex.withLock {
@@ -165,12 +216,22 @@ class StateMachine(
     /**
      * Attempts to fire [transition].
      *
-     * Throws [TransitionError.Unknown] if [transition] isn't part of the
-     * graph, or [TransitionError.NotAllowed] if it doesn't start from
-     * [currentState]. Otherwise every matching observer runs — in the
-     * fixed lifecycle order — and this call only returns once they've all
-     * finished, so the machine's state is settled by the time the caller
-     * continues.
+     * Checks, in order: throws [TransitionError.Unknown] if [transition]
+     * isn't part of the graph, [TransitionError.NotAllowed] if it doesn't
+     * start from [currentState], then [TransitionError.GuardRejected] if the
+     * registered instance's guard returns `false` for [userInfo]. The guard
+     * evaluated is the one on the transition registered in the graph, never
+     * the one on [transition]. A rejected or throwing guard leaves
+     * [currentState] unchanged and runs no handler; a guard's exception
+     * reaches the caller unchanged.
+     *
+     * Guards run while the machine holds its lock, so a guard must not call
+     * [fire], [canFire], [allowedTransitions], [on] or [off] on this machine;
+     * reading [currentState] is fine.
+     *
+     * Otherwise every matching observer runs — in the fixed lifecycle
+     * order — and this call only returns once they've all finished, so the
+     * machine's state is settled by the time the caller continues.
      *
      * If an observer throws, the remaining observers are skipped and the
      * exception reaches the caller unchanged:
@@ -195,6 +256,10 @@ class StateMachine(
             if (transition.from != current) {
                 throw TransitionError.NotAllowed(transition, current)
             }
+            val guard = registered(transition).guard
+            if (guard != null && !guard(userInfo)) {
+                throw TransitionError.GuardRejected(transition)
+            }
 
             val leavingState = current
 
@@ -208,4 +273,6 @@ class StateMachine(
             observers[LifecycleEvent.AfterTransition(transition)]?.invoke(userInfo)
         }
     }
+
+    private fun registered(transition: Transition): Transition = transitions.first { it == transition }
 }
