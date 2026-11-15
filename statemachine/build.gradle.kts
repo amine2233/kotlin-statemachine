@@ -1,33 +1,38 @@
 import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
 
 plugins {
-    kotlin("jvm")
-    `java-library`
+    alias(libs.plugins.kotlin.multiplatform)
     `maven-publish`
     alias(libs.plugins.kover)
     alias(libs.plugins.dokka)
-}
-
-dependencies {
-    api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
-
-    testImplementation(kotlin("test"))
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
 }
 
 kotlin {
     explicitApi()
     jvmToolchain(17)
 
+    jvm()
+    iosArm64()
+    iosSimulatorArm64()
+    js(IR) {
+        nodejs()
+    }
+
     @OptIn(ExperimentalAbiValidation::class)
     abiValidation()
+
+    sourceSets {
+        commonMain.dependencies {
+            api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
+        }
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+        }
+    }
 }
 
-java {
-    withSourcesJar()
-}
-
-tasks.test {
+tasks.named<Test>("jvmTest") {
     useJUnitPlatform()
 }
 
@@ -43,15 +48,7 @@ kover {
 
 publishing {
     publications {
-        create<MavenPublication>("gpr") {
-            // Kotlin's jvm plugin registers a "java" software component;
-            // this pulls in the main jar + the sources jar configured above.
-            from(components["java"])
-
-            groupId = project.group.toString()
-            artifactId = "statemachine"
-            version = project.version.toString()
-
+        withType<MavenPublication>().configureEach {
             pom {
                 name.set("StateMachine")
                 description.set(

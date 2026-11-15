@@ -1,0 +1,192 @@
+// Klib ABI Dump
+// Targets: [iosArm64, iosSimulatorArm64, js]
+// Rendering settings:
+// - Signature version: 2
+// - Show manifest properties: true
+// - Show declarations: true
+
+// Library unique name: <com.amine2233.statemachine:statemachine>
+open annotation class com.amine2233.statemachine/StateMachineDsl : kotlin/Annotation { // com.amine2233.statemachine/StateMachineDsl|null[0]
+    constructor <init>() // com.amine2233.statemachine/StateMachineDsl.<init>|<init>(){}[0]
+}
+
+final class com.amine2233.statemachine/State { // com.amine2233.statemachine/State|null[0]
+    constructor <init>(kotlin/String) // com.amine2233.statemachine/State.<init>|<init>(kotlin.String){}[0]
+
+    final val name // com.amine2233.statemachine/State.name|{}name[0]
+        final fun <get-name>(): kotlin/String // com.amine2233.statemachine/State.name.<get-name>|<get-name>(){}[0]
+
+    final fun component1(): kotlin/String // com.amine2233.statemachine/State.component1|component1(){}[0]
+    final fun copy(kotlin/String = ...): com.amine2233.statemachine/State // com.amine2233.statemachine/State.copy|copy(kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.amine2233.statemachine/State.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.amine2233.statemachine/State.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.amine2233.statemachine/State.toString|toString(){}[0]
+}
+
+final class com.amine2233.statemachine/StateBuilder { // com.amine2233.statemachine/StateBuilder|null[0]
+    final fun on(kotlin/String, kotlin.coroutines/SuspendFunction1<kotlin.collections/Map<kotlin/String, kotlin/Any?>?, kotlin/Boolean>? = ...): com.amine2233.statemachine/TransitionTarget // com.amine2233.statemachine/StateBuilder.on|on(kotlin.String;kotlin.coroutines.SuspendFunction1<kotlin.collections.Map<kotlin.String,kotlin.Any?>?,kotlin.Boolean>?){}[0]
+    final fun onEnter(kotlin.coroutines/SuspendFunction1<kotlin.collections/Map<kotlin/String, kotlin/Any?>?, kotlin/Unit>) // com.amine2233.statemachine/StateBuilder.onEnter|onEnter(kotlin.coroutines.SuspendFunction1<kotlin.collections.Map<kotlin.String,kotlin.Any?>?,kotlin.Unit>){}[0]
+    final fun onLeave(kotlin.coroutines/SuspendFunction1<kotlin.collections/Map<kotlin/String, kotlin/Any?>?, kotlin/Unit>) // com.amine2233.statemachine/StateBuilder.onLeave|onLeave(kotlin.coroutines.SuspendFunction1<kotlin.collections.Map<kotlin.String,kotlin.Any?>?,kotlin.Unit>){}[0]
+}
+
+final class com.amine2233.statemachine/StateMachine { // com.amine2233.statemachine/StateMachine|null[0]
+    constructor <init>(com.amine2233.statemachine/State, kotlin.collections/List<com.amine2233.statemachine/Transition>) // com.amine2233.statemachine/StateMachine.<init>|<init>(com.amine2233.statemachine.State;kotlin.collections.List<com.amine2233.statemachine.Transition>){}[0]
+
+    final val currentState // com.amine2233.statemachine/StateMachine.currentState|{}currentState[0]
+        final fun <get-currentState>(): com.amine2233.statemachine/State // com.amine2233.statemachine/StateMachine.currentState.<get-currentState>|<get-currentState>(){}[0]
+    final val state // com.amine2233.statemachine/StateMachine.state|{}state[0]
+        final fun <get-state>(): kotlinx.coroutines.flow/StateFlow<com.amine2233.statemachine/State> // com.amine2233.statemachine/StateMachine.state.<get-state>|<get-state>(){}[0]
+
+    final fun isCurrent(com.amine2233.statemachine/State): kotlin/Boolean // com.amine2233.statemachine/StateMachine.isCurrent|isCurrent(com.amine2233.statemachine.State){}[0]
+    final suspend fun allowedTransitions(): kotlin.collections/List<com.amine2233.statemachine/Transition> // com.amine2233.statemachine/StateMachine.allowedTransitions|allowedTransitions(){}[0]
+    final suspend fun canFire(com.amine2233.statemachine/Transition, kotlin.collections/Map<kotlin/String, kotlin/Any?>? = ...): kotlin/Boolean // com.amine2233.statemachine/StateMachine.canFire|canFire(com.amine2233.statemachine.Transition;kotlin.collections.Map<kotlin.String,kotlin.Any?>?){}[0]
+    final suspend fun fire(com.amine2233.statemachine/Transition, kotlin.collections/Map<kotlin/String, kotlin/Any?>? = ...) // com.amine2233.statemachine/StateMachine.fire|fire(com.amine2233.statemachine.Transition;kotlin.collections.Map<kotlin.String,kotlin.Any?>?){}[0]
+    final suspend fun fire(kotlin/String, kotlin.collections/Map<kotlin/String, kotlin/Any?>? = ...) // com.amine2233.statemachine/StateMachine.fire|fire(kotlin.String;kotlin.collections.Map<kotlin.String,kotlin.Any?>?){}[0]
+    final suspend fun off(com.amine2233.statemachine/LifecycleEvent) // com.amine2233.statemachine/StateMachine.off|off(com.amine2233.statemachine.LifecycleEvent){}[0]
+    final suspend fun on(com.amine2233.statemachine/LifecycleEvent, kotlin.coroutines/SuspendFunction1<kotlin.collections/Map<kotlin/String, kotlin/Any?>?, kotlin/Unit>) // com.amine2233.statemachine/StateMachine.on|on(com.amine2233.statemachine.LifecycleEvent;kotlin.coroutines.SuspendFunction1<kotlin.collections.Map<kotlin.String,kotlin.Any?>?,kotlin.Unit>){}[0]
+    final suspend fun transition(kotlin/String): com.amine2233.statemachine/Transition? // com.amine2233.statemachine/StateMachine.transition|transition(kotlin.String){}[0]
+}
+
+final class com.amine2233.statemachine/StateMachineBuilder { // com.amine2233.statemachine/StateMachineBuilder|null[0]
+    final fun afterTransition(kotlin/String, kotlin.coroutines/SuspendFunction1<kotlin.collections/Map<kotlin/String, kotlin/Any?>?, kotlin/Unit>) // com.amine2233.statemachine/StateMachineBuilder.afterTransition|afterTransition(kotlin.String;kotlin.coroutines.SuspendFunction1<kotlin.collections.Map<kotlin.String,kotlin.Any?>?,kotlin.Unit>){}[0]
+    final fun beforeTransition(kotlin/String, kotlin.coroutines/SuspendFunction1<kotlin.collections/Map<kotlin/String, kotlin/Any?>?, kotlin/Unit>) // com.amine2233.statemachine/StateMachineBuilder.beforeTransition|beforeTransition(kotlin.String;kotlin.coroutines.SuspendFunction1<kotlin.collections.Map<kotlin.String,kotlin.Any?>?,kotlin.Unit>){}[0]
+    final fun onTransition(kotlin/String, kotlin.coroutines/SuspendFunction1<kotlin.collections/Map<kotlin/String, kotlin/Any?>?, kotlin/Unit>) // com.amine2233.statemachine/StateMachineBuilder.onTransition|onTransition(kotlin.String;kotlin.coroutines.SuspendFunction1<kotlin.collections.Map<kotlin.String,kotlin.Any?>?,kotlin.Unit>){}[0]
+    final fun state(kotlin/String, kotlin/Function1<com.amine2233.statemachine/StateBuilder, kotlin/Unit> = ...) // com.amine2233.statemachine/StateMachineBuilder.state|state(kotlin.String;kotlin.Function1<com.amine2233.statemachine.StateBuilder,kotlin.Unit>){}[0]
+    final fun transition(kotlin/String, kotlin/String, kotlin/String, kotlin.coroutines/SuspendFunction1<kotlin.collections/Map<kotlin/String, kotlin/Any?>?, kotlin/Boolean>? = ...) // com.amine2233.statemachine/StateMachineBuilder.transition|transition(kotlin.String;kotlin.String;kotlin.String;kotlin.coroutines.SuspendFunction1<kotlin.collections.Map<kotlin.String,kotlin.Any?>?,kotlin.Boolean>?){}[0]
+}
+
+final class com.amine2233.statemachine/Transition { // com.amine2233.statemachine/Transition|null[0]
+    constructor <init>(kotlin/String, com.amine2233.statemachine/State, com.amine2233.statemachine/State, kotlin.coroutines/SuspendFunction1<kotlin.collections/Map<kotlin/String, kotlin/Any?>?, kotlin/Boolean>? = ...) // com.amine2233.statemachine/Transition.<init>|<init>(kotlin.String;com.amine2233.statemachine.State;com.amine2233.statemachine.State;kotlin.coroutines.SuspendFunction1<kotlin.collections.Map<kotlin.String,kotlin.Any?>?,kotlin.Boolean>?){}[0]
+
+    final val from // com.amine2233.statemachine/Transition.from|{}from[0]
+        final fun <get-from>(): com.amine2233.statemachine/State // com.amine2233.statemachine/Transition.from.<get-from>|<get-from>(){}[0]
+    final val guard // com.amine2233.statemachine/Transition.guard|{}guard[0]
+        final fun <get-guard>(): kotlin.coroutines/SuspendFunction1<kotlin.collections/Map<kotlin/String, kotlin/Any?>?, kotlin/Boolean>? // com.amine2233.statemachine/Transition.guard.<get-guard>|<get-guard>(){}[0]
+    final val name // com.amine2233.statemachine/Transition.name|{}name[0]
+        final fun <get-name>(): kotlin/String // com.amine2233.statemachine/Transition.name.<get-name>|<get-name>(){}[0]
+    final val to // com.amine2233.statemachine/Transition.to|{}to[0]
+        final fun <get-to>(): com.amine2233.statemachine/State // com.amine2233.statemachine/Transition.to.<get-to>|<get-to>(){}[0]
+
+    final fun component1(): kotlin/String // com.amine2233.statemachine/Transition.component1|component1(){}[0]
+    final fun component2(): com.amine2233.statemachine/State // com.amine2233.statemachine/Transition.component2|component2(){}[0]
+    final fun component3(): com.amine2233.statemachine/State // com.amine2233.statemachine/Transition.component3|component3(){}[0]
+    final fun component4(): kotlin.coroutines/SuspendFunction1<kotlin.collections/Map<kotlin/String, kotlin/Any?>?, kotlin/Boolean>? // com.amine2233.statemachine/Transition.component4|component4(){}[0]
+    final fun copy(kotlin/String = ..., com.amine2233.statemachine/State = ..., com.amine2233.statemachine/State = ..., kotlin.coroutines/SuspendFunction1<kotlin.collections/Map<kotlin/String, kotlin/Any?>?, kotlin/Boolean>? = ...): com.amine2233.statemachine/Transition // com.amine2233.statemachine/Transition.copy|copy(kotlin.String;com.amine2233.statemachine.State;com.amine2233.statemachine.State;kotlin.coroutines.SuspendFunction1<kotlin.collections.Map<kotlin.String,kotlin.Any?>?,kotlin.Boolean>?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.amine2233.statemachine/Transition.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.amine2233.statemachine/Transition.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.amine2233.statemachine/Transition.toString|toString(){}[0]
+}
+
+final class com.amine2233.statemachine/TransitionTarget { // com.amine2233.statemachine/TransitionTarget|null[0]
+    final fun goesTo(kotlin/String) // com.amine2233.statemachine/TransitionTarget.goesTo|goesTo(kotlin.String){}[0]
+}
+
+sealed class com.amine2233.statemachine/LifecycleEvent { // com.amine2233.statemachine/LifecycleEvent|null[0]
+    final class AfterTransition : com.amine2233.statemachine/LifecycleEvent { // com.amine2233.statemachine/LifecycleEvent.AfterTransition|null[0]
+        constructor <init>(com.amine2233.statemachine/Transition) // com.amine2233.statemachine/LifecycleEvent.AfterTransition.<init>|<init>(com.amine2233.statemachine.Transition){}[0]
+
+        final val transition // com.amine2233.statemachine/LifecycleEvent.AfterTransition.transition|{}transition[0]
+            final fun <get-transition>(): com.amine2233.statemachine/Transition // com.amine2233.statemachine/LifecycleEvent.AfterTransition.transition.<get-transition>|<get-transition>(){}[0]
+
+        final fun component1(): com.amine2233.statemachine/Transition // com.amine2233.statemachine/LifecycleEvent.AfterTransition.component1|component1(){}[0]
+        final fun copy(com.amine2233.statemachine/Transition = ...): com.amine2233.statemachine/LifecycleEvent.AfterTransition // com.amine2233.statemachine/LifecycleEvent.AfterTransition.copy|copy(com.amine2233.statemachine.Transition){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.amine2233.statemachine/LifecycleEvent.AfterTransition.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.amine2233.statemachine/LifecycleEvent.AfterTransition.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.amine2233.statemachine/LifecycleEvent.AfterTransition.toString|toString(){}[0]
+    }
+
+    final class BeforeTransition : com.amine2233.statemachine/LifecycleEvent { // com.amine2233.statemachine/LifecycleEvent.BeforeTransition|null[0]
+        constructor <init>(com.amine2233.statemachine/Transition) // com.amine2233.statemachine/LifecycleEvent.BeforeTransition.<init>|<init>(com.amine2233.statemachine.Transition){}[0]
+
+        final val transition // com.amine2233.statemachine/LifecycleEvent.BeforeTransition.transition|{}transition[0]
+            final fun <get-transition>(): com.amine2233.statemachine/Transition // com.amine2233.statemachine/LifecycleEvent.BeforeTransition.transition.<get-transition>|<get-transition>(){}[0]
+
+        final fun component1(): com.amine2233.statemachine/Transition // com.amine2233.statemachine/LifecycleEvent.BeforeTransition.component1|component1(){}[0]
+        final fun copy(com.amine2233.statemachine/Transition = ...): com.amine2233.statemachine/LifecycleEvent.BeforeTransition // com.amine2233.statemachine/LifecycleEvent.BeforeTransition.copy|copy(com.amine2233.statemachine.Transition){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.amine2233.statemachine/LifecycleEvent.BeforeTransition.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.amine2233.statemachine/LifecycleEvent.BeforeTransition.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.amine2233.statemachine/LifecycleEvent.BeforeTransition.toString|toString(){}[0]
+    }
+
+    final class LeaveState : com.amine2233.statemachine/LifecycleEvent { // com.amine2233.statemachine/LifecycleEvent.LeaveState|null[0]
+        constructor <init>(com.amine2233.statemachine/State) // com.amine2233.statemachine/LifecycleEvent.LeaveState.<init>|<init>(com.amine2233.statemachine.State){}[0]
+
+        final val state // com.amine2233.statemachine/LifecycleEvent.LeaveState.state|{}state[0]
+            final fun <get-state>(): com.amine2233.statemachine/State // com.amine2233.statemachine/LifecycleEvent.LeaveState.state.<get-state>|<get-state>(){}[0]
+
+        final fun component1(): com.amine2233.statemachine/State // com.amine2233.statemachine/LifecycleEvent.LeaveState.component1|component1(){}[0]
+        final fun copy(com.amine2233.statemachine/State = ...): com.amine2233.statemachine/LifecycleEvent.LeaveState // com.amine2233.statemachine/LifecycleEvent.LeaveState.copy|copy(com.amine2233.statemachine.State){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.amine2233.statemachine/LifecycleEvent.LeaveState.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.amine2233.statemachine/LifecycleEvent.LeaveState.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.amine2233.statemachine/LifecycleEvent.LeaveState.toString|toString(){}[0]
+    }
+
+    final class OnState : com.amine2233.statemachine/LifecycleEvent { // com.amine2233.statemachine/LifecycleEvent.OnState|null[0]
+        constructor <init>(com.amine2233.statemachine/State) // com.amine2233.statemachine/LifecycleEvent.OnState.<init>|<init>(com.amine2233.statemachine.State){}[0]
+
+        final val state // com.amine2233.statemachine/LifecycleEvent.OnState.state|{}state[0]
+            final fun <get-state>(): com.amine2233.statemachine/State // com.amine2233.statemachine/LifecycleEvent.OnState.state.<get-state>|<get-state>(){}[0]
+
+        final fun component1(): com.amine2233.statemachine/State // com.amine2233.statemachine/LifecycleEvent.OnState.component1|component1(){}[0]
+        final fun copy(com.amine2233.statemachine/State = ...): com.amine2233.statemachine/LifecycleEvent.OnState // com.amine2233.statemachine/LifecycleEvent.OnState.copy|copy(com.amine2233.statemachine.State){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.amine2233.statemachine/LifecycleEvent.OnState.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.amine2233.statemachine/LifecycleEvent.OnState.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.amine2233.statemachine/LifecycleEvent.OnState.toString|toString(){}[0]
+    }
+
+    final class OnTransition : com.amine2233.statemachine/LifecycleEvent { // com.amine2233.statemachine/LifecycleEvent.OnTransition|null[0]
+        constructor <init>(com.amine2233.statemachine/Transition) // com.amine2233.statemachine/LifecycleEvent.OnTransition.<init>|<init>(com.amine2233.statemachine.Transition){}[0]
+
+        final val transition // com.amine2233.statemachine/LifecycleEvent.OnTransition.transition|{}transition[0]
+            final fun <get-transition>(): com.amine2233.statemachine/Transition // com.amine2233.statemachine/LifecycleEvent.OnTransition.transition.<get-transition>|<get-transition>(){}[0]
+
+        final fun component1(): com.amine2233.statemachine/Transition // com.amine2233.statemachine/LifecycleEvent.OnTransition.component1|component1(){}[0]
+        final fun copy(com.amine2233.statemachine/Transition = ...): com.amine2233.statemachine/LifecycleEvent.OnTransition // com.amine2233.statemachine/LifecycleEvent.OnTransition.copy|copy(com.amine2233.statemachine.Transition){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.amine2233.statemachine/LifecycleEvent.OnTransition.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.amine2233.statemachine/LifecycleEvent.OnTransition.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.amine2233.statemachine/LifecycleEvent.OnTransition.toString|toString(){}[0]
+    }
+}
+
+sealed class com.amine2233.statemachine/TransitionError : kotlin/Exception { // com.amine2233.statemachine/TransitionError|null[0]
+    final class GuardRejected : com.amine2233.statemachine/TransitionError { // com.amine2233.statemachine/TransitionError.GuardRejected|null[0]
+        constructor <init>(com.amine2233.statemachine/Transition) // com.amine2233.statemachine/TransitionError.GuardRejected.<init>|<init>(com.amine2233.statemachine.Transition){}[0]
+
+        final val transition // com.amine2233.statemachine/TransitionError.GuardRejected.transition|{}transition[0]
+            final fun <get-transition>(): com.amine2233.statemachine/Transition // com.amine2233.statemachine/TransitionError.GuardRejected.transition.<get-transition>|<get-transition>(){}[0]
+    }
+
+    final class NotAllowed : com.amine2233.statemachine/TransitionError { // com.amine2233.statemachine/TransitionError.NotAllowed|null[0]
+        constructor <init>(com.amine2233.statemachine/Transition, com.amine2233.statemachine/State) // com.amine2233.statemachine/TransitionError.NotAllowed.<init>|<init>(com.amine2233.statemachine.Transition;com.amine2233.statemachine.State){}[0]
+
+        final val currentState // com.amine2233.statemachine/TransitionError.NotAllowed.currentState|{}currentState[0]
+            final fun <get-currentState>(): com.amine2233.statemachine/State // com.amine2233.statemachine/TransitionError.NotAllowed.currentState.<get-currentState>|<get-currentState>(){}[0]
+        final val transition // com.amine2233.statemachine/TransitionError.NotAllowed.transition|{}transition[0]
+            final fun <get-transition>(): com.amine2233.statemachine/Transition // com.amine2233.statemachine/TransitionError.NotAllowed.transition.<get-transition>|<get-transition>(){}[0]
+    }
+
+    final class ReentrantFire : com.amine2233.statemachine/TransitionError { // com.amine2233.statemachine/TransitionError.ReentrantFire|null[0]
+        constructor <init>(com.amine2233.statemachine/Transition) // com.amine2233.statemachine/TransitionError.ReentrantFire.<init>|<init>(com.amine2233.statemachine.Transition){}[0]
+
+        final val transition // com.amine2233.statemachine/TransitionError.ReentrantFire.transition|{}transition[0]
+            final fun <get-transition>(): com.amine2233.statemachine/Transition // com.amine2233.statemachine/TransitionError.ReentrantFire.transition.<get-transition>|<get-transition>(){}[0]
+    }
+
+    final class Unknown : com.amine2233.statemachine/TransitionError { // com.amine2233.statemachine/TransitionError.Unknown|null[0]
+        constructor <init>(com.amine2233.statemachine/Transition) // com.amine2233.statemachine/TransitionError.Unknown.<init>|<init>(com.amine2233.statemachine.Transition){}[0]
+
+        final val transition // com.amine2233.statemachine/TransitionError.Unknown.transition|{}transition[0]
+            final fun <get-transition>(): com.amine2233.statemachine/Transition // com.amine2233.statemachine/TransitionError.Unknown.transition.<get-transition>|<get-transition>(){}[0]
+    }
+
+    final class UnknownName : com.amine2233.statemachine/TransitionError { // com.amine2233.statemachine/TransitionError.UnknownName|null[0]
+        constructor <init>(kotlin/String, com.amine2233.statemachine/State) // com.amine2233.statemachine/TransitionError.UnknownName.<init>|<init>(kotlin.String;com.amine2233.statemachine.State){}[0]
+
+        final val currentState // com.amine2233.statemachine/TransitionError.UnknownName.currentState|{}currentState[0]
+            final fun <get-currentState>(): com.amine2233.statemachine/State // com.amine2233.statemachine/TransitionError.UnknownName.currentState.<get-currentState>|<get-currentState>(){}[0]
+        final val name // com.amine2233.statemachine/TransitionError.UnknownName.name|{}name[0]
+            final fun <get-name>(): kotlin/String // com.amine2233.statemachine/TransitionError.UnknownName.name.<get-name>|<get-name>(){}[0]
+    }
+}
+
+final fun com.amine2233.statemachine/stateMachine(kotlin/String, kotlin/Function1<com.amine2233.statemachine/StateMachineBuilder, kotlin/Unit>): com.amine2233.statemachine/StateMachine // com.amine2233.statemachine/stateMachine|stateMachine(kotlin.String;kotlin.Function1<com.amine2233.statemachine.StateMachineBuilder,kotlin.Unit>){}[0]

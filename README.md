@@ -10,13 +10,14 @@ string.
 
 ## Modules
 
-- `statemachine` — the library (published to GitHub Packages).
+- `statemachine` — the library, a Kotlin Multiplatform module (published to GitHub Packages).
 - `sample-kiosk` — a runnable kiosk food-ordering example built on top of it.
 
 ## Requirements
 
 - JDK 17+
 - Kotlin 2.0 / kotlinx-coroutines 1.8
+- Targets: JVM (17+), `iosArm64`, `iosSimulatorArm64` and JS (IR) on Node.js
 
 ## Usage
 
@@ -240,17 +241,22 @@ collects the machine's `state` the way a Compose screen would.
 ## Development
 
 ```
-mise run test                 # run the library's unit tests and the ABI check
+mise run test                 # library tests on every host-supported target, sample tests, ABI check
 mise run test-coverage        # tests + Kover report in statemachine/build/reports/kover/html
 mise run build_documentations # Dokka API docs in statemachine/build/dokka/html
 mise run lint                 # ktlint
 mise run build                # compile everything
 ```
 
-The public API is guarded by explicit API mode and a committed ABI dump in
-`statemachine/api/`. `mise run test` and `./gradlew build` fail when the dump
+`mise run test` runs the JVM and JS tests everywhere and the iOS simulator
+tests only on macOS. CI runs on Linux, so it does not run the iOS tests yet;
+run them locally on a Mac.
+
+The public API is guarded by explicit API mode and committed ABI dumps in
+`statemachine/api/`: `statemachine.api` for the JVM and `statemachine.klib.api`
+for the iOS and JS klibs. `mise run test` and `./gradlew build` fail when the dump
 is stale. After an intentional API change, run
-`./gradlew :statemachine:updateKotlinAbi` and commit the updated dump. An
+`./gradlew :statemachine:updateKotlinAbi` and commit the updated dumps. An
 incompatible change (a removed or changed signature) needs a `feat!:` commit or
 a `BREAKING CHANGE:` footer so semantic-release bumps the major version.
 
@@ -261,15 +267,28 @@ All logic lives in `mise.toml`:
 
 - `mise run test` / `mise run lint` — what the `CI` workflow runs on pull requests.
 - Merging a `feat:` / `fix:` commit into `main` runs semantic-release: it tags
-  `vX.Y.Z`, updates `CHANGELOG.md`, publishes `com.amine2233.statemachine:statemachine`
-  to GitHub Packages and creates the GitHub release with the jars attached.
+  `vX.Y.Z`, updates `CHANGELOG.md`, publishes the `com.amine2233.statemachine`
+  artifacts to GitHub Packages and creates the GitHub release with the jars attached.
 - `mise run release --dry-run` previews the next version locally. The
   semantic-release packages are pinned in the `release` task of `mise.toml`
   and must be bumped together.
 
 ### Consuming the published package
 
-From another Gradle project:
+`statemachine` is published with the standard Kotlin Multiplatform layout under
+one coordinate, `com.amine2233.statemachine:statemachine`. Its Gradle Module
+Metadata points each consumer at the right per-platform artifact, so Gradle
+users never name a platform artifact themselves:
+
+| artifactId | contents |
+| --- | --- |
+| `statemachine` | the root module: Gradle Module Metadata and common metadata |
+| `statemachine-jvm` | the JVM jar (JVM 17+, also picked by Android projects) |
+| `statemachine-js` | the JS (IR, Node.js) klib |
+| `statemachine-iosarm64` | the `iosArm64` klib |
+| `statemachine-iossimulatorarm64` | the `iosSimulatorArm64` klib |
+
+Add the GitHub Packages repository to the consuming Gradle project:
 
 ```kotlin
 repositories {
@@ -281,11 +300,49 @@ repositories {
         }
     }
 }
+```
 
+A JVM-only Gradle project depends on the root coordinate and gets the JVM jar:
+
+```kotlin
 dependencies {
-    implementation("com.amine2233.statemachine:statemachine:1.0.0")
+    implementation("com.amine2233.statemachine:statemachine:2.0.0")
 }
 ```
+
+A Kotlin Multiplatform project uses the same coordinate from `commonMain`, and
+each target resolves its own artifact:
+
+```kotlin
+kotlin {
+    sourceSets {
+        commonMain.dependencies {
+            implementation("com.amine2233.statemachine:statemachine:2.0.0")
+        }
+    }
+}
+```
+
+Plain Maven does not read Gradle Module Metadata, so Maven projects depend on
+the JVM artifact directly:
+
+```xml
+<dependency>
+    <groupId>com.amine2233.statemachine</groupId>
+    <artifactId>statemachine-jvm</artifactId>
+    <version>2.0.0</version>
+</dependency>
+```
+
+No XCFramework, Swift Package Manager or CocoaPods packaging is provided; iOS
+code consumes the klibs from a Kotlin Multiplatform project.
+
+#### Migrating from 1.x
+
+- Gradle: bump the version to `2.0.0`; the coordinate stays
+  `com.amine2233.statemachine:statemachine`.
+- Maven: change the `artifactId` from `statemachine` to `statemachine-jvm` and
+  bump the version to `2.0.0`.
 
 GitHub Packages requires authentication even for public read access — the
 consumer needs a personal access token with `read:packages` scope.

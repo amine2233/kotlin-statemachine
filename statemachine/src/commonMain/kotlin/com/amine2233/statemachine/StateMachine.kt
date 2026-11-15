@@ -8,6 +8,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
+import kotlin.jvm.JvmOverloads
 
 /*
  * Kotlin port of amine2233/StateMachine (https://github.com/amine2233/StateMachine).
