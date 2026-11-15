@@ -57,6 +57,18 @@ machine.fire(publish, userInfo = mapOf("id" to "article-42"))
 
 `BeforeTransition -> LeaveState -> OnState -> OnTransition -> AfterTransition`.
 
+#### What handlers may do
+
+- Handlers may call `currentState`, `isCurrent`, `canFire`, `allowedTransitions`,
+  `on` and `off` on the machine that runs them.
+- Reads see the old state in `BeforeTransition` and `LeaveState`, and the new
+  state from `OnState` onwards.
+- `on`/`off` called from a handler apply from the next `fire`, never to the
+  transition in progress.
+- Calling `fire` on the same machine from a handler throws
+  `TransitionError.ReentrantFire`.
+- Concurrent `fire` calls from different coroutines still run one at a time.
+
 ### Restoring a machine
 
 The graph is static; only the cursor moves. Save `currentState.name`, and pass
