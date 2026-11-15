@@ -1,0 +1,137 @@
+public abstract class com/amine2233/statemachine/LifecycleEvent {
+}
+
+public final class com/amine2233/statemachine/LifecycleEvent$AfterTransition : com/amine2233/statemachine/LifecycleEvent {
+	public fun <init> (Lcom/amine2233/statemachine/Transition;)V
+	public final fun component1 ()Lcom/amine2233/statemachine/Transition;
+	public final fun copy (Lcom/amine2233/statemachine/Transition;)Lcom/amine2233/statemachine/LifecycleEvent$AfterTransition;
+	public static synthetic fun copy$default (Lcom/amine2233/statemachine/LifecycleEvent$AfterTransition;Lcom/amine2233/statemachine/Transition;ILjava/lang/Object;)Lcom/amine2233/statemachine/LifecycleEvent$AfterTransition;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getTransition ()Lcom/amine2233/statemachine/Transition;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/amine2233/statemachine/LifecycleEvent$BeforeTransition : com/amine2233/statemachine/LifecycleEvent {
+	public fun <init> (Lcom/amine2233/statemachine/Transition;)V
+	public final fun component1 ()Lcom/amine2233/statemachine/Transition;
+	public final fun copy (Lcom/amine2233/statemachine/Transition;)Lcom/amine2233/statemachine/LifecycleEvent$BeforeTransition;
+	public static synthetic fun copy$default (Lcom/amine2233/statemachine/LifecycleEvent$BeforeTransition;Lcom/amine2233/statemachine/Transition;ILjava/lang/Object;)Lcom/amine2233/statemachine/LifecycleEvent$BeforeTransition;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getTransition ()Lcom/amine2233/statemachine/Transition;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/amine2233/statemachine/LifecycleEvent$LeaveState : com/amine2233/statemachine/LifecycleEvent {
+	public fun <init> (Lcom/amine2233/statemachine/State;)V
+	public final fun component1 ()Lcom/amine2233/statemachine/State;
+	public final fun copy (Lcom/amine2233/statemachine/State;)Lcom/amine2233/statemachine/LifecycleEvent$LeaveState;
+	public static synthetic fun copy$default (Lcom/amine2233/statemachine/LifecycleEvent$LeaveState;Lcom/amine2233/statemachine/State;ILjava/lang/Object;)Lcom/amine2233/statemachine/LifecycleEvent$LeaveState;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getState ()Lcom/amine2233/statemachine/State;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/amine2233/statemachine/LifecycleEvent$OnState : com/amine2233/statemachine/LifecycleEvent {
+	public fun <init> (Lcom/amine2233/statemachine/State;)V
+	public final fun component1 ()Lcom/amine2233/statemachine/State;
+	public final fun copy (Lcom/amine2233/statemachine/State;)Lcom/amine2233/statemachine/LifecycleEvent$OnState;
+	public static synthetic fun copy$default (Lcom/amine2233/statemachine/LifecycleEvent$OnState;Lcom/amine2233/statemachine/State;ILjava/lang/Object;)Lcom/amine2233/statemachine/LifecycleEvent$OnState;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getState ()Lcom/amine2233/statemachine/State;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/amine2233/statemachine/LifecycleEvent$OnTransition : com/amine2233/statemachine/LifecycleEvent {
+	public fun <init> (Lcom/amine2233/statemachine/Transition;)V
+	public final fun component1 ()Lcom/amine2233/statemachine/Transition;
+	public final fun copy (Lcom/amine2233/statemachine/Transition;)Lcom/amine2233/statemachine/LifecycleEvent$OnTransition;
+	public static synthetic fun copy$default (Lcom/amine2233/statemachine/LifecycleEvent$OnTransition;Lcom/amine2233/statemachine/Transition;ILjava/lang/Object;)Lcom/amine2233/statemachine/LifecycleEvent$OnTransition;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getTransition ()Lcom/amine2233/statemachine/Transition;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/amine2233/statemachine/State {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/amine2233/statemachine/State;
+	public static synthetic fun copy$default (Lcom/amine2233/statemachine/State;Ljava/lang/String;ILjava/lang/Object;)Lcom/amine2233/statemachine/State;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getName ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/amine2233/statemachine/StateMachine {
+	public fun <init> (Lcom/amine2233/statemachine/State;Ljava/util/List;)V
+	public final fun allowedTransitions (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun canFire (Lcom/amine2233/statemachine/Transition;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun canFire (Lcom/amine2233/statemachine/Transition;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun canFire$default (Lcom/amine2233/statemachine/StateMachine;Lcom/amine2233/statemachine/Transition;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun fire (Lcom/amine2233/statemachine/Transition;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun fire (Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun fire$default (Lcom/amine2233/statemachine/StateMachine;Lcom/amine2233/statemachine/Transition;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun fire$default (Lcom/amine2233/statemachine/StateMachine;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun getCurrentState ()Lcom/amine2233/statemachine/State;
+	public final fun getState ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun isCurrent (Lcom/amine2233/statemachine/State;)Z
+	public final fun off (Lcom/amine2233/statemachine/LifecycleEvent;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun on (Lcom/amine2233/statemachine/LifecycleEvent;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun transition (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/amine2233/statemachine/Transition {
+	public fun <init> (Ljava/lang/String;Lcom/amine2233/statemachine/State;Lcom/amine2233/statemachine/State;)V
+	public fun <init> (Ljava/lang/String;Lcom/amine2233/statemachine/State;Lcom/amine2233/statemachine/State;Lkotlin/jvm/functions/Function2;)V
+	public synthetic fun <init> (Ljava/lang/String;Lcom/amine2233/statemachine/State;Lcom/amine2233/statemachine/State;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lcom/amine2233/statemachine/State;
+	public final fun component3 ()Lcom/amine2233/statemachine/State;
+	public final fun component4 ()Lkotlin/jvm/functions/Function2;
+	public final fun copy (Ljava/lang/String;Lcom/amine2233/statemachine/State;Lcom/amine2233/statemachine/State;Lkotlin/jvm/functions/Function2;)Lcom/amine2233/statemachine/Transition;
+	public static synthetic fun copy$default (Lcom/amine2233/statemachine/Transition;Ljava/lang/String;Lcom/amine2233/statemachine/State;Lcom/amine2233/statemachine/State;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Lcom/amine2233/statemachine/Transition;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFrom ()Lcom/amine2233/statemachine/State;
+	public final fun getGuard ()Lkotlin/jvm/functions/Function2;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getTo ()Lcom/amine2233/statemachine/State;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract class com/amine2233/statemachine/TransitionError : java/lang/Exception {
+	public synthetic fun <init> (Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+}
+
+public final class com/amine2233/statemachine/TransitionError$GuardRejected : com/amine2233/statemachine/TransitionError {
+	public fun <init> (Lcom/amine2233/statemachine/Transition;)V
+	public final fun getTransition ()Lcom/amine2233/statemachine/Transition;
+}
+
+public final class com/amine2233/statemachine/TransitionError$NotAllowed : com/amine2233/statemachine/TransitionError {
+	public fun <init> (Lcom/amine2233/statemachine/Transition;Lcom/amine2233/statemachine/State;)V
+	public final fun getCurrentState ()Lcom/amine2233/statemachine/State;
+	public final fun getTransition ()Lcom/amine2233/statemachine/Transition;
+}
+
+public final class com/amine2233/statemachine/TransitionError$ReentrantFire : com/amine2233/statemachine/TransitionError {
+	public fun <init> (Lcom/amine2233/statemachine/Transition;)V
+	public final fun getTransition ()Lcom/amine2233/statemachine/Transition;
+}
+
+public final class com/amine2233/statemachine/TransitionError$Unknown : com/amine2233/statemachine/TransitionError {
+	public fun <init> (Lcom/amine2233/statemachine/Transition;)V
+	public final fun getTransition ()Lcom/amine2233/statemachine/Transition;
+}
+
+public final class com/amine2233/statemachine/TransitionError$UnknownName : com/amine2233/statemachine/TransitionError {
+	public fun <init> (Ljava/lang/String;Lcom/amine2233/statemachine/State;)V
+	public final fun getCurrentState ()Lcom/amine2233/statemachine/State;
+	public final fun getName ()Ljava/lang/String;
+}
+

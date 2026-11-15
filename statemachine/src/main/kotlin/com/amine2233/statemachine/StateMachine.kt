@@ -26,8 +26,8 @@ import kotlin.coroutines.CoroutineContext
  */
 
 /** A named node in the graph. Two states are equal when their names match. */
-data class State(
-    val name: String,
+public data class State(
+    public val name: String,
 ) {
     override fun toString(): String = name
 }
@@ -51,13 +51,13 @@ data class State(
  * [TransitionError.ReentrantFire]. An exception thrown by a guard reaches the
  * caller unchanged.
  */
-data class Transition
+public data class Transition
     @JvmOverloads
     constructor(
-        val name: String,
-        val from: State,
-        val to: State,
-        val guard: (suspend (UserInfo?) -> Boolean)? = null,
+        public val name: String,
+        public val from: State,
+        public val to: State,
+        public val guard: (suspend (UserInfo?) -> Boolean)? = null,
     ) {
         override fun equals(other: Any?): Boolean = other is Transition && name == other.name && from == other.from && to == other.to
 
@@ -72,37 +72,37 @@ data class Transition
     }
 
 /** Mirrors Swift's `TransitionError`. */
-sealed class TransitionError(
+public sealed class TransitionError(
     message: String,
 ) : Exception(message) {
     /** [transition] is not part of this machine's graph at all. */
-    class Unknown(
-        val transition: Transition,
+    public class Unknown(
+        public val transition: Transition,
     ) : TransitionError("Transition '${transition.name}' is unknown to this machine.")
 
     /** [transition] exists in the graph but doesn't start from [currentState]. */
-    class NotAllowed(
-        val transition: Transition,
-        val currentState: State,
+    public class NotAllowed(
+        public val transition: Transition,
+        public val currentState: State,
     ) : TransitionError(
             "Transition '${transition.name}' requires state '${transition.from.name}' " +
                 "but the machine is currently in '${currentState.name}'.",
         )
 
     /** [transition] is allowed from the current state but its guard returned `false`. */
-    class GuardRejected(
-        val transition: Transition,
+    public class GuardRejected(
+        public val transition: Transition,
     ) : TransitionError("Transition '${transition.name}' was rejected by its guard.")
 
     /** No transition called [name] leaves [currentState]. */
-    class UnknownName(
-        val name: String,
-        val currentState: State,
+    public class UnknownName(
+        public val name: String,
+        public val currentState: State,
     ) : TransitionError("No transition named '$name' leaves state '${currentState.name}'.")
 
     /** `fire` was called from a lifecycle handler of the same machine while a transition was running. */
-    class ReentrantFire(
-        val transition: Transition,
+    public class ReentrantFire(
+        public val transition: Transition,
     ) : TransitionError(
             "Transition '${transition.name}' was fired from a lifecycle handler of the same machine " +
                 "while a transition was in progress.",
@@ -123,33 +123,33 @@ sealed class TransitionError(
  * [AfterTransition] run after the move and cannot undo it. In both cases the
  * first handler that throws stops the remaining handlers of that lifecycle.
  */
-sealed class LifecycleEvent {
-    data class BeforeTransition(
-        val transition: Transition,
+public sealed class LifecycleEvent {
+    public data class BeforeTransition(
+        public val transition: Transition,
     ) : LifecycleEvent()
 
-    data class LeaveState(
-        val state: State,
+    public data class LeaveState(
+        public val state: State,
     ) : LifecycleEvent()
 
-    data class OnState(
-        val state: State,
+    public data class OnState(
+        public val state: State,
     ) : LifecycleEvent()
 
-    data class OnTransition(
-        val transition: Transition,
+    public data class OnTransition(
+        public val transition: Transition,
     ) : LifecycleEvent()
 
-    data class AfterTransition(
-        val transition: Transition,
+    public data class AfterTransition(
+        public val transition: Transition,
     ) : LifecycleEvent()
 }
 
 /** Free-form payload passed through `fire` to observers, like Swift's `userInfo`. */
-typealias UserInfo = Map<String, Any?>
+public typealias UserInfo = Map<String, Any?>
 
 /** An observer callback. May suspend, exactly like the `async` closures in Swift. */
-typealias LifecycleHandler = suspend (UserInfo?) -> Unit
+public typealias LifecycleHandler = suspend (UserInfo?) -> Unit
 
 /**
  * The machine itself. Construct it with the full graph; from then on it only
@@ -173,7 +173,7 @@ typealias LifecycleHandler = suspend (UserInfo?) -> Unit
  * machine.currentState == published // true
  * ```
  */
-class StateMachine(
+public class StateMachine(
     initialState: State,
     private val transitions: List<Transition>,
 ) {
@@ -224,18 +224,18 @@ class StateMachine(
      * slow collector may miss intermediate states. A transition into a state
      * equal to the current one emits nothing.
      */
-    val state: StateFlow<State> = _state.asStateFlow()
+    public val state: StateFlow<State> = _state.asStateFlow()
 
     /**
      * The machine's cursor, the current value of [state]. Safe to read from any
      * thread without suspending — writes only ever happen inside [fire], one at
      * a time, so this is always one of the graph's states, never a torn value.
      */
-    val currentState: State
+    public val currentState: State
         get() = _state.value
 
     /** Equivalent to `currentState == state`, spelled out for readability at call sites. */
-    fun isCurrent(state: State): Boolean = _state.value == state
+    public fun isCurrent(state: State): Boolean = _state.value == state
 
     /**
      * Whether [transition] exists, starts from [currentState] and, if the
@@ -249,7 +249,7 @@ class StateMachine(
      * Never moves the cursor and never runs a handler.
      */
     @JvmOverloads
-    suspend fun canFire(
+    public suspend fun canFire(
         transition: Transition,
         userInfo: UserInfo? = null,
     ): Boolean {
@@ -266,7 +266,7 @@ class StateMachine(
      * transition may still be rejected by its guard. Use
      * [canFire] (`canFire(transition, userInfo)`) for the guarded answer.
      */
-    suspend fun allowedTransitions(): List<Transition> =
+    public suspend fun allowedTransitions(): List<Transition> =
         mutex.withLock {
             transitions.filter { it.from == _state.value }
         }
@@ -277,7 +277,7 @@ class StateMachine(
      * transition to run. The returned instance is the one registered in the
      * graph, guard included.
      */
-    suspend fun transition(named: String): Transition? =
+    public suspend fun transition(named: String): Transition? =
         mutex.withLock {
             outgoing(named)
         }
@@ -290,7 +290,7 @@ class StateMachine(
      * When called during a [fire] (from a handler, for example), the change
      * applies from the next [fire], never to the transition in progress.
      */
-    suspend fun on(
+    public suspend fun on(
         event: LifecycleEvent,
         handler: LifecycleHandler,
     ) {
@@ -301,7 +301,7 @@ class StateMachine(
      * Removes any handler registered for [event], if one exists. When called
      * during a [fire], the change applies from the next [fire].
      */
-    suspend fun off(event: LifecycleEvent) {
+    public suspend fun off(event: LifecycleEvent) {
         mutex.withLock { observers.remove(event) }
     }
 
@@ -347,7 +347,7 @@ class StateMachine(
      * transition can be fired again, and after a post-move throw the
      * transitions out of the new state can be fired.
      */
-    suspend fun fire(
+    public suspend fun fire(
         transition: Transition,
         userInfo: UserInfo? = null,
     ) {
@@ -383,7 +383,7 @@ class StateMachine(
      * to from the state the handler sees, or [TransitionError.UnknownName] if
      * the name resolves to nothing there.
      */
-    suspend fun fire(
+    public suspend fun fire(
         name: String,
         userInfo: UserInfo? = null,
     ) {
