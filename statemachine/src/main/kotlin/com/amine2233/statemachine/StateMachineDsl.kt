@@ -6,7 +6,7 @@ package com.amine2233.statemachine
  * called from inside a `state` block without an explicit receiver.
  */
 @DslMarker
-annotation class StateMachineDsl
+public annotation class StateMachineDsl
 
 /**
  * Builds a [StateMachine] from a declarative block, starting in the state
@@ -46,14 +46,14 @@ annotation class StateMachineDsl
  *   built machine behaves exactly like a hand-built one: [StateMachine.on]
  *   and [StateMachine.off] replace or remove seeded handlers like any other.
  */
-fun stateMachine(
+public fun stateMachine(
     initial: String,
     block: StateMachineBuilder.() -> Unit,
 ): StateMachine = StateMachineBuilder().apply(block).build(initial)
 
 /** The scope of a [stateMachine] block. */
 @StateMachineDsl
-class StateMachineBuilder internal constructor() {
+public class StateMachineBuilder internal constructor() {
     private val transitions = mutableListOf<Transition>()
 
     private val handlers = mutableMapOf<LifecycleEvent, LifecycleHandler>()
@@ -69,7 +69,7 @@ class StateMachineBuilder internal constructor() {
      * Declaring the same name again merges the blocks; a second `onEnter` or
      * `onLeave` for the state still throws [IllegalArgumentException].
      */
-    fun state(
+    public fun state(
         name: String,
         block: StateBuilder.() -> Unit = {},
     ) {
@@ -80,7 +80,7 @@ class StateMachineBuilder internal constructor() {
      * Declares `Transition(name, from, to, guard)`. [from] and [to] need no
      * `state` block of their own.
      */
-    fun transition(
+    public fun transition(
         name: String,
         from: String,
         to: String,
@@ -93,7 +93,7 @@ class StateMachineBuilder internal constructor() {
      * Registers [handler] for [LifecycleEvent.BeforeTransition] on every
      * transition called [name], wherever it is declared in the block.
      */
-    fun beforeTransition(
+    public fun beforeTransition(
         name: String,
         handler: LifecycleHandler,
     ) {
@@ -104,7 +104,7 @@ class StateMachineBuilder internal constructor() {
      * Registers [handler] for [LifecycleEvent.OnTransition] on every
      * transition called [name], wherever it is declared in the block.
      */
-    fun onTransition(
+    public fun onTransition(
         name: String,
         handler: LifecycleHandler,
     ) {
@@ -115,7 +115,7 @@ class StateMachineBuilder internal constructor() {
      * Registers [handler] for [LifecycleEvent.AfterTransition] on every
      * transition called [name], wherever it is declared in the block.
      */
-    fun afterTransition(
+    public fun afterTransition(
         name: String,
         handler: LifecycleHandler,
     ) {
@@ -166,7 +166,7 @@ class StateMachineBuilder internal constructor() {
 
 /** The scope of a [StateMachineBuilder.state] block, for the state it declares. */
 @StateMachineDsl
-class StateBuilder internal constructor(
+public class StateBuilder internal constructor(
     private val state: State,
     private val machine: StateMachineBuilder,
 ) {
@@ -177,18 +177,18 @@ class StateBuilder internal constructor(
      * with [TransitionTarget.goesTo]. An `on(name)` left without `goesTo`
      * throws [IllegalArgumentException] when the block ends.
      */
-    fun on(
+    public fun on(
         name: String,
         guard: (suspend (UserInfo?) -> Boolean)? = null,
     ): TransitionTarget = TransitionTarget(name, state, guard, machine).also { pending += it }
 
     /** Registers [handler] for [LifecycleEvent.OnState] of this state. */
-    fun onEnter(handler: LifecycleHandler) {
+    public fun onEnter(handler: LifecycleHandler) {
         machine.addHandler(LifecycleEvent.OnState(state), "onEnter", "state '${state.name}'", handler)
     }
 
     /** Registers [handler] for [LifecycleEvent.LeaveState] of this state. */
-    fun onLeave(handler: LifecycleHandler) {
+    public fun onLeave(handler: LifecycleHandler) {
         machine.addHandler(LifecycleEvent.LeaveState(state), "onLeave", "state '${state.name}'", handler)
     }
 
@@ -201,7 +201,7 @@ class StateBuilder internal constructor(
 
 /** A transition started with [StateBuilder.on], waiting for its target. */
 @StateMachineDsl
-class TransitionTarget internal constructor(
+public class TransitionTarget internal constructor(
     internal val name: String,
     private val from: State,
     private val guard: (suspend (UserInfo?) -> Boolean)?,
@@ -211,7 +211,7 @@ class TransitionTarget internal constructor(
         private set
 
     /** Declares `Transition(name, from = this state, to = target, guard)`. */
-    infix fun goesTo(target: String) {
+    public infix fun goesTo(target: String) {
         machine.transition(name, from.name, target, guard)
         declared = true
     }
