@@ -70,11 +70,14 @@ if [[ "${usage_dry_run:-}" == "true" ]]; then
     dry_run_opt="--dry-run"
 fi
 
+# Versions are pinned together: the conventional-changelog-conventionalcommits
+# major must match the conventional-changelog-writer major used by
+# semantic-release's bundled release-notes-generator (preset 9 for writer 8).
 npx --yes \
-    -p semantic-release \
-    -p @semantic-release/changelog \
-    -p @semantic-release/exec \
-    -p @semantic-release/git \
-    -p conventional-changelog-conventionalcommits \
+    -p semantic-release@25.0.9 \
+    -p @semantic-release/changelog@7.0.0 \
+    -p @semantic-release/exec@7.1.0 \
+    -p @semantic-release/git@11.0.1 \
+    -p conventional-changelog-conventionalcommits@9.3.1 \
     semantic-release $dry_run_opt
 '''
