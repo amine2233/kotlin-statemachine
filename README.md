@@ -25,6 +25,67 @@ import com.amine2233.statemachine.*
 import kotlinx.coroutines.runBlocking
 
 fun main() = runBlocking {
+    val machine =
+        stateMachine(initial = "draft") {
+            state("draft") {
+                on("publish") goesTo "review"
+                onLeave { println("leaving draft") }
+            }
+            state("review") {
+                on("approve", guard = { userInfo -> userInfo?.get("approved") == true }) goesTo "published"
+                on("reject") goesTo "draft"
+            }
+            state("published") {
+                onEnter { userInfo -> println("published! id=${userInfo?.get("id")}") }
+            }
+            transition("archive", from = "published", to = "archived")
+            afterTransition("archive") { println("archived") }
+        }
+
+    machine.fire("publish")
+    machine.fire("approve", userInfo = mapOf("approved" to true, "id" to "article-42"))
+    machine.fire("archive")
+    println(machine.currentState) // archived
+}
+```
+
+`stateMachine(initial) { ... }` builds a plain `StateMachine`, so everything
+below applies to it unchanged. It is not a suspend call.
+
+- `state(name) { ... }` declares a state. Inside it, `on(name, guard) goesTo target`
+  declares a transition out of that state, and `onEnter`/`onLeave` register the
+  `OnState`/`LeaveState` handlers. Declaring the same state twice merges the blocks.
+- `transition(name, from, to, guard)` declares a transition at the top level.
+- `beforeTransition(name)`, `onTransition(name)` and `afterTransition(name)`
+  register a handler on **every** transition with that name, so one
+  `beforeTransition("cancel")` covers `cancel` from any state.
+- States are plain strings. A state that is only a target or a `from`/`to`
+  (`archived` above) needs no `state` block, and references may come before or
+  after the state's block.
+- Transitions keep the order they are written in, so `allowedTransitions()`
+  lists them in that order.
+
+`stateMachine(...)` throws `IllegalArgumentException`, naming the state or
+transition, when:
+
+- `initial` is not the `from` or `to` of any transition;
+- two transitions have the same name and the same `from` state;
+- a lifecycle event gets a second handler, such as two `onEnter` for one state
+  (even across merged blocks) or two `beforeTransition("x")`;
+- `beforeTransition`, `onTransition` or `afterTransition` names a transition
+  that is not declared;
+- an `on("x")` has no `goesTo`.
+
+### The lower-level API
+
+The DSL is a thin layer over `State`, `Transition` and the `StateMachine`
+constructor, which you can also use directly:
+
+```kotlin
+import com.amine2233.statemachine.*
+import kotlinx.coroutines.runBlocking
+
+fun main() = runBlocking {
     val draft = State("draft")
     val published = State("published")
     val publish = Transition("publish", from = draft, to = published)
@@ -151,6 +212,16 @@ val machine = StateMachine(
     initialState = State(order.state),
     transitions = OrderWorkflow.transitions,
 )
+```
+
+With the DSL, pass the saved name as `initial`:
+
+```kotlin
+val machine =
+    stateMachine(initial = savedName) {
+        state("draft") { on("publish") goesTo "published" }
+        state("published") { on("archive") goesTo "archived" }
+    }
 ```
 
 The restored state must belong to the graph: if no transition starts or ends
