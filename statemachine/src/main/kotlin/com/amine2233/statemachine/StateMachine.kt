@@ -210,6 +210,19 @@ class StateMachine(
     private val observers = mutableMapOf<LifecycleEvent, LifecycleHandler>()
 
     /**
+     * Builds the machine like the public constructor, then seeds [handlers]
+     * as if each had been registered with [on], before the instance escapes.
+     * Used by [stateMachine] so building a machine never suspends.
+     */
+    internal constructor(
+        initialState: State,
+        transitions: List<Transition>,
+        handlers: Map<LifecycleEvent, LifecycleHandler>,
+    ) : this(initialState, transitions) {
+        observers.putAll(handlers)
+    }
+
+    /**
      * The machine's cursor as a [StateFlow], for UI layers to collect.
      *
      * Its initial value is the `initialState` passed to the constructor. It is
