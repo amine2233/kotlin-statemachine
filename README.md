@@ -40,7 +40,7 @@ Firing a transition the machine does not know throws `TransitionError.Unknown`;
 firing one that does not start from the current state throws
 `TransitionError.NotAllowed`; firing one whose guard refuses it throws
 `TransitionError.GuardRejected` (see [Guarded transitions](#guarded-transitions)).
-Ask first with `canFire(transition)` or `allowedTransitions()` — the latter is
+Ask first with `canFire(transition, userInfo)` or `allowedTransitions()` — the latter is
 what UI usually binds to, so buttons enable themselves from the graph.
 
 `machine.state` is a `StateFlow<State>` of the same cursor as `currentState`,
