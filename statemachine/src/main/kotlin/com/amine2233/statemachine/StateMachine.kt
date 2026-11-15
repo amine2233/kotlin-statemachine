@@ -26,42 +26,42 @@ import kotlin.coroutines.CoroutineContext
  */
 
 /** A named node in the graph. Two states are equal when their names match. */
-data class State(
-    val name: String,
+public data class State(
+    public val name: String,
 ) {
     override fun toString(): String = name
 }
 
 /** A named edge: firing it moves the machine from [from] to [to]. */
-data class Transition(
-    val name: String,
-    val from: State,
-    val to: State,
+public data class Transition(
+    public val name: String,
+    public val from: State,
+    public val to: State,
 ) {
     override fun toString(): String = "$name (${from.name} -> ${to.name})"
 }
 
 /** Mirrors Swift's `TransitionError`. */
-sealed class TransitionError(
+public sealed class TransitionError(
     message: String,
 ) : Exception(message) {
     /** [transition] is not part of this machine's graph at all. */
-    class Unknown(
-        val transition: Transition,
+    public class Unknown(
+        public val transition: Transition,
     ) : TransitionError("Transition '${transition.name}' is unknown to this machine.")
 
     /** [transition] exists in the graph but doesn't start from [currentState]. */
-    class NotAllowed(
-        val transition: Transition,
-        val currentState: State,
+    public class NotAllowed(
+        public val transition: Transition,
+        public val currentState: State,
     ) : TransitionError(
             "Transition '${transition.name}' requires state '${transition.from.name}' " +
                 "but the machine is currently in '${currentState.name}'.",
         )
 
     /** `fire` was called from a lifecycle handler of the same machine while a transition was running. */
-    class ReentrantFire(
-        val transition: Transition,
+    public class ReentrantFire(
+        public val transition: Transition,
     ) : TransitionError(
             "Transition '${transition.name}' was fired from a lifecycle handler of the same machine " +
                 "while a transition was in progress.",
@@ -82,33 +82,33 @@ sealed class TransitionError(
  * [AfterTransition] run after the move and cannot undo it. In both cases the
  * first handler that throws stops the remaining handlers of that lifecycle.
  */
-sealed class LifecycleEvent {
-    data class BeforeTransition(
-        val transition: Transition,
+public sealed class LifecycleEvent {
+    public data class BeforeTransition(
+        public val transition: Transition,
     ) : LifecycleEvent()
 
-    data class LeaveState(
-        val state: State,
+    public data class LeaveState(
+        public val state: State,
     ) : LifecycleEvent()
 
-    data class OnState(
-        val state: State,
+    public data class OnState(
+        public val state: State,
     ) : LifecycleEvent()
 
-    data class OnTransition(
-        val transition: Transition,
+    public data class OnTransition(
+        public val transition: Transition,
     ) : LifecycleEvent()
 
-    data class AfterTransition(
-        val transition: Transition,
+    public data class AfterTransition(
+        public val transition: Transition,
     ) : LifecycleEvent()
 }
 
 /** Free-form payload passed through `fire` to observers, like Swift's `userInfo`. */
-typealias UserInfo = Map<String, Any?>
+public typealias UserInfo = Map<String, Any?>
 
 /** An observer callback. May suspend, exactly like the `async` closures in Swift. */
-typealias LifecycleHandler = suspend (UserInfo?) -> Unit
+public typealias LifecycleHandler = suspend (UserInfo?) -> Unit
 
 /**
  * The machine itself. Construct it with the full graph; from then on it only
@@ -125,7 +125,7 @@ typealias LifecycleHandler = suspend (UserInfo?) -> Unit
  * machine.currentState == published // true
  * ```
  */
-class StateMachine(
+public class StateMachine(
     initialState: State,
     private val transitions: List<Transition>,
 ) {
@@ -154,21 +154,21 @@ class StateMachine(
      * slow collector may miss intermediate states. A transition into a state
      * equal to the current one emits nothing.
      */
-    val state: StateFlow<State> = _state.asStateFlow()
+    public val state: StateFlow<State> = _state.asStateFlow()
 
     /**
      * The machine's cursor, the current value of [state]. Safe to read from any
      * thread without suspending — writes only ever happen inside [fire], one at
      * a time, so this is always one of the graph's states, never a torn value.
      */
-    val currentState: State
+    public val currentState: State
         get() = _state.value
 
     /** Equivalent to `currentState == state`, spelled out for readability at call sites. */
-    fun isCurrent(state: State): Boolean = _state.value == state
+    public fun isCurrent(state: State): Boolean = _state.value == state
 
     /** Whether [transition] both exists and starts from [currentState]. */
-    suspend fun canFire(transition: Transition): Boolean =
+    public suspend fun canFire(transition: Transition): Boolean =
         mutex.withLock {
             transitions.contains(transition) && transition.from == _state.value
         }
@@ -177,7 +177,7 @@ class StateMachine(
      * Transitions that could fire right now. This is what UI usually binds
      * to — buttons enable themselves from the graph.
      */
-    suspend fun allowedTransitions(): List<Transition> =
+    public suspend fun allowedTransitions(): List<Transition> =
         mutex.withLock {
             transitions.filter { it.from == _state.value }
         }
@@ -190,7 +190,7 @@ class StateMachine(
      * When called during a [fire] (from a handler, for example), the change
      * applies from the next [fire], never to the transition in progress.
      */
-    suspend fun on(
+    public suspend fun on(
         event: LifecycleEvent,
         handler: LifecycleHandler,
     ) {
@@ -201,7 +201,7 @@ class StateMachine(
      * Removes any handler registered for [event], if one exists. When called
      * during a [fire], the change applies from the next [fire].
      */
-    suspend fun off(event: LifecycleEvent) {
+    public suspend fun off(event: LifecycleEvent) {
         mutex.withLock { observers.remove(event) }
     }
 
@@ -235,7 +235,7 @@ class StateMachine(
      * transition can be fired again, and after a post-move throw the
      * transitions out of the new state can be fired.
      */
-    suspend fun fire(
+    public suspend fun fire(
         transition: Transition,
         userInfo: UserInfo? = null,
     ) {

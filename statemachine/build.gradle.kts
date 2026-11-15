@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
+
 plugins {
     kotlin("jvm")
     `java-library`
@@ -12,7 +14,11 @@ dependencies {
 }
 
 kotlin {
+    explicitApi()
     jvmToolchain(17)
+
+    @OptIn(ExperimentalAbiValidation::class)
+    abiValidation()
 }
 
 java {
