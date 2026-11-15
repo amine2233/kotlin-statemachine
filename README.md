@@ -106,10 +106,17 @@ collects the machine's `state` the way a Compose screen would.
 ## Development
 
 ```
-mise run test   # run the library's unit tests
+mise run test   # run the library's unit tests and the ABI check
 mise run lint   # ktlint
 mise run build  # compile everything
 ```
+
+The public API is guarded by explicit API mode and a committed ABI dump in
+`statemachine/api/`. `mise run test` and `./gradlew build` fail when the dump
+is stale. After an intentional API change, run
+`./gradlew :statemachine:updateKotlinAbi` and commit the updated dump. An
+incompatible change (a removed or changed signature) needs a `feat!:` commit or
+a `BREAKING CHANGE:` footer so semantic-release bumps the major version.
 
 ## CI/CD
 
