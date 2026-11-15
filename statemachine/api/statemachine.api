@@ -67,6 +67,13 @@ public final class com/amine2233/statemachine/State {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/amine2233/statemachine/StateBuilder {
+	public final fun on (Ljava/lang/String;Lkotlin/jvm/functions/Function2;)Lcom/amine2233/statemachine/TransitionTarget;
+	public static synthetic fun on$default (Lcom/amine2233/statemachine/StateBuilder;Ljava/lang/String;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Lcom/amine2233/statemachine/TransitionTarget;
+	public final fun onEnter (Lkotlin/jvm/functions/Function2;)V
+	public final fun onLeave (Lkotlin/jvm/functions/Function2;)V
+}
+
 public final class com/amine2233/statemachine/StateMachine {
 	public fun <init> (Lcom/amine2233/statemachine/State;Ljava/util/List;)V
 	public final fun allowedTransitions (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -83,6 +90,23 @@ public final class com/amine2233/statemachine/StateMachine {
 	public final fun off (Lcom/amine2233/statemachine/LifecycleEvent;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun on (Lcom/amine2233/statemachine/LifecycleEvent;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun transition (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/amine2233/statemachine/StateMachineBuilder {
+	public final fun afterTransition (Ljava/lang/String;Lkotlin/jvm/functions/Function2;)V
+	public final fun beforeTransition (Ljava/lang/String;Lkotlin/jvm/functions/Function2;)V
+	public final fun onTransition (Ljava/lang/String;Lkotlin/jvm/functions/Function2;)V
+	public final fun state (Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
+	public static synthetic fun state$default (Lcom/amine2233/statemachine/StateMachineBuilder;Ljava/lang/String;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)V
+	public final fun transition (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function2;)V
+	public static synthetic fun transition$default (Lcom/amine2233/statemachine/StateMachineBuilder;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)V
+}
+
+public abstract interface annotation class com/amine2233/statemachine/StateMachineDsl : java/lang/annotation/Annotation {
+}
+
+public final class com/amine2233/statemachine/StateMachineDslKt {
+	public static final fun stateMachine (Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Lcom/amine2233/statemachine/StateMachine;
 }
 
 public final class com/amine2233/statemachine/Transition {
@@ -133,5 +157,9 @@ public final class com/amine2233/statemachine/TransitionError$UnknownName : com/
 	public fun <init> (Ljava/lang/String;Lcom/amine2233/statemachine/State;)V
 	public final fun getCurrentState ()Lcom/amine2233/statemachine/State;
 	public final fun getName ()Ljava/lang/String;
+}
+
+public final class com/amine2233/statemachine/TransitionTarget {
+	public final fun goesTo (Ljava/lang/String;)V
 }
 
