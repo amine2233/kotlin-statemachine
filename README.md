@@ -67,6 +67,20 @@ after it. A throw in `BeforeTransition` or `LeaveState` vetoes the transition:
 target state and stays there. Either way the machine stays usable. A handler
 that must not interrupt the lifecycle should catch its own exceptions.
 
+#### What handlers may do
+
+- Handlers may call `currentState`, `isCurrent`, `canFire`, `allowedTransitions`,
+  `on` and `off` on the machine that runs them.
+- Reads see the old state in `BeforeTransition` and `LeaveState`, and the new
+  state from `OnState` onwards.
+- `on`/`off` called from a handler apply from the next `fire`, never to the
+  transition in progress.
+- Calling `fire` on the same machine from a handler throws
+  `TransitionError.ReentrantFire`.
+- Concurrent `fire` calls from different coroutines still run one at a time.
+- A `state` collector, even one on an unconfined dispatcher that runs inline
+  when the cursor moves, may call back into the machine the same way.
+
 ### Restoring a machine
 
 The graph is static; only the cursor moves. Save `currentState.name`, and pass

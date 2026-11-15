@@ -1,10 +1,13 @@
 package com.amine2233.statemachine
 
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import kotlin.coroutines.CoroutineContext
 
 /*
  * Kotlin port of amine2233/StateMachine (https://github.com/amine2233/StateMachine).
@@ -16,7 +19,10 @@ import kotlinx.coroutines.sync.withLock
  *
  * The Swift version is isolated by an `actor`; Kotlin has no actor keyword,
  * so the same "only one caller mutates state at a time" guarantee is
- * reproduced with a [Mutex] and suspend functions.
+ * reproduced with a [Mutex] and suspend functions. The lock covers only
+ * short reads and the handler map; lifecycle handlers and the cursor write run
+ * outside it, so handlers and state collectors may call back into the machine.
+ * A second, fire-only lock keeps `fire` calls, and so cursor writes, serialized.
  */
 
 /** A named node in the graph. Two states are equal when their names match. */
@@ -51,6 +57,14 @@ sealed class TransitionError(
     ) : TransitionError(
             "Transition '${transition.name}' requires state '${transition.from.name}' " +
                 "but the machine is currently in '${currentState.name}'.",
+        )
+
+    /** `fire` was called from a lifecycle handler of the same machine while a transition was running. */
+    class ReentrantFire(
+        val transition: Transition,
+    ) : TransitionError(
+            "Transition '${transition.name}' was fired from a lifecycle handler of the same machine " +
+                "while a transition was in progress.",
         )
 }
 
@@ -117,6 +131,10 @@ class StateMachine(
 ) {
     private val mutex = Mutex()
 
+    private val fireMutex = Mutex()
+
+    private val firing = FiringElement()
+
     private val _state = MutableStateFlow(initialState)
 
     private val observers = mutableMapOf<LifecycleEvent, LifecycleHandler>()
@@ -125,8 +143,11 @@ class StateMachine(
      * The machine's cursor as a [StateFlow], for UI layers to collect.
      *
      * Its initial value is the `initialState` passed to the constructor. It is
-     * updated while [mutex] is held, after the [LifecycleEvent.LeaveState]
-     * handlers and before the [LifecycleEvent.OnState] handlers run.
+     * updated by [fire] under the fire-only lock but outside [mutex], after the
+     * [LifecycleEvent.LeaveState] handlers and before the [LifecycleEvent.OnState]
+     * handlers run. A collector that runs inline on that write (for example on
+     * an unconfined dispatcher) may call back into the machine: reads work
+     * immediately, and a [fire] waits until the running one has returned.
      *
      * Like any [StateFlow] it is conflated: a collector that keeps up (for
      * example one on an unconfined dispatcher) sees every state in order, but a
@@ -137,8 +158,8 @@ class StateMachine(
 
     /**
      * The machine's cursor, the current value of [state]. Safe to read from any
-     * thread without suspending — writes only ever happen while [mutex] is held,
-     * so this is always one of the graph's states, never a torn value.
+     * thread without suspending — writes only ever happen inside [fire], one at
+     * a time, so this is always one of the graph's states, never a torn value.
      */
     val currentState: State
         get() = _state.value
@@ -165,6 +186,9 @@ class StateMachine(
      * Registers [handler] for [event]. Only one handler per [LifecycleEvent]
      * is kept — calling this again with an event equal to one already
      * registered replaces the previous handler.
+     *
+     * When called during a [fire] (from a handler, for example), the change
+     * applies from the next [fire], never to the transition in progress.
      */
     suspend fun on(
         event: LifecycleEvent,
@@ -173,7 +197,10 @@ class StateMachine(
         mutex.withLock { observers[event] = handler }
     }
 
-    /** Removes any handler registered for [event], if one exists. */
+    /**
+     * Removes any handler registered for [event], if one exists. When called
+     * during a [fire], the change applies from the next [fire].
+     */
     suspend fun off(event: LifecycleEvent) {
         mutex.withLock { observers.remove(event) }
     }
@@ -188,6 +215,14 @@ class StateMachine(
      * finished, so the machine's state is settled by the time the caller
      * continues.
      *
+     * Calls are serialized: a `fire` from another coroutine waits until this
+     * one has run all its handlers and returned (or thrown). The handlers for
+     * this transition are snapshotted before any of them runs, so [on]/[off]
+     * calls made meanwhile apply from the next `fire`. Handlers run outside
+     * the state lock and may read the machine or call [on]/[off]; calling
+     * `fire` on the same machine from a handler throws
+     * [TransitionError.ReentrantFire].
+     *
      * If an observer throws, the remaining observers are skipped and the
      * exception reaches the caller unchanged:
      * - a throw in [LifecycleEvent.BeforeTransition] or [LifecycleEvent.LeaveState]
@@ -196,7 +231,7 @@ class StateMachine(
      *   [LifecycleEvent.AfterTransition] happens after the move, so
      *   [currentState] is already [Transition.to] and stays there.
      *
-     * Either way the lock is released, so the machine stays usable: a vetoed
+     * Either way both locks are released, so the machine stays usable: a vetoed
      * transition can be fired again, and after a post-move throw the
      * transitions out of the new state can be fired.
      */
@@ -204,24 +239,54 @@ class StateMachine(
         transition: Transition,
         userInfo: UserInfo? = null,
     ) {
-        mutex.withLock {
-            if (!transitions.contains(transition)) {
-                throw TransitionError.Unknown(transition)
-            }
-            if (transition.from != _state.value) {
-                throw TransitionError.NotAllowed(transition, _state.value)
-            }
-
-            val leavingState = _state.value
-
-            observers[LifecycleEvent.BeforeTransition(transition)]?.invoke(userInfo)
-            observers[LifecycleEvent.LeaveState(leavingState)]?.invoke(userInfo)
-
-            _state.value = transition.to
-
-            observers[LifecycleEvent.OnState(transition.to)]?.invoke(userInfo)
-            observers[LifecycleEvent.OnTransition(transition)]?.invoke(userInfo)
-            observers[LifecycleEvent.AfterTransition(transition)]?.invoke(userInfo)
+        if (currentCoroutineContext()[firing] != null) {
+            throw TransitionError.ReentrantFire(transition)
         }
+
+        fireMutex.withLock {
+            val handlers =
+                mutex.withLock {
+                    if (!transitions.contains(transition)) {
+                        throw TransitionError.Unknown(transition)
+                    }
+                    if (transition.from != _state.value) {
+                        throw TransitionError.NotAllowed(transition, _state.value)
+                    }
+
+                    TransitionHandlers(
+                        before = observers[LifecycleEvent.BeforeTransition(transition)],
+                        leave = observers[LifecycleEvent.LeaveState(transition.from)],
+                        onState = observers[LifecycleEvent.OnState(transition.to)],
+                        onTransition = observers[LifecycleEvent.OnTransition(transition)],
+                        after = observers[LifecycleEvent.AfterTransition(transition)],
+                    )
+                }
+
+            withContext(firing) {
+                handlers.before?.invoke(userInfo)
+                handlers.leave?.invoke(userInfo)
+
+                _state.value = transition.to
+
+                handlers.onState?.invoke(userInfo)
+                handlers.onTransition?.invoke(userInfo)
+                handlers.after?.invoke(userInfo)
+            }
+        }
+    }
+
+    private class TransitionHandlers(
+        val before: LifecycleHandler?,
+        val leave: LifecycleHandler?,
+        val onState: LifecycleHandler?,
+        val onTransition: LifecycleHandler?,
+        val after: LifecycleHandler?,
+    )
+
+    /** Marks a coroutine context as running this machine's handlers; its own key, so it is per instance. */
+    private class FiringElement :
+        CoroutineContext.Element,
+        CoroutineContext.Key<FiringElement> {
+        override val key: CoroutineContext.Key<*> get() = this
     }
 }
