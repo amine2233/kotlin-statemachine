@@ -19,8 +19,8 @@ description = "Compile everything and run all checks."
 run = "./gradlew build --no-daemon"
 
 [tasks.test]
-description = "Run the unit tests."
-run = "./gradlew test --no-daemon"
+description = "Run the unit tests and the ABI check."
+run = "./gradlew test checkKotlinAbi --no-daemon"
 
 [tasks.test-coverage]
 description = "Run the unit tests with a Kover coverage report."
