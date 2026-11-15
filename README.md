@@ -269,7 +269,9 @@ All logic lives in `mise.toml`:
 - Merging a `feat:` / `fix:` commit into `main` runs semantic-release: it tags
   `vX.Y.Z`, updates `CHANGELOG.md`, publishes the `com.amine2233.statemachine`
   artifacts to GitHub Packages and creates the GitHub release with the jars attached.
-- `mise run release --dry-run` previews the next version locally.
+- `mise run release --dry-run` previews the next version locally. The
+  semantic-release packages are pinned in the `release` task of `mise.toml`
+  and must be bumped together.
 
 ### Consuming the published package
 
