@@ -16,5 +16,5 @@ jobs:
     uses: amine2233/kotlin-ci-shared/.github/workflows/ci.yml@1.0.0
     with:
       enable-lint: true
-      enable-coverage: false
+      enable-coverage: true
       enable-title-check: true
